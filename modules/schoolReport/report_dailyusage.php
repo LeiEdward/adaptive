@@ -138,31 +138,39 @@
   $sManageCity = $vUserData['city_name'];
   $sFindData = '*'; // 資料分類
 
-  $sSQLCond = "SELECT $sFindData FROM report_dailyusage ";
+  $sReprotSQL = "SELECT $sFindData FROM report_dailyusage ";
   switch ($sUserLevel) {
     case '41': // 縣市政府
-      $sSQLCond .= "WHERE city_name IN('$sManageCity') ";
-      if(isset($_POST['time'])) $sSQLCond .= " AND ";
+      $sReprotSQL .= "WHERE city_name IN('$sManageCity') ";
+      if(isset($_POST['time'])) $sReprotSQL .= " AND ";
       break;
 
     case '51': // 教育部
-      $sSQLCond .= " WHERE ";
+      if(isset($_POST['time'])) $sReprotSQL .= " WHERE ";
       break;
   }
   if(isset($_POST['time'])) {
     if ('sreach' === $_POST['time']) {
-      $sSQLCond .= ' (datetime_log > "'.$_POST['search_start'].'" AND datetime_log < "'.$_POST['search_end'].'") ';
+      $sReprotSQL .= ' (datetime_log > "'.$_POST['search_start'].'" AND datetime_log < "'.$_POST['search_end'].'") ';
     }
     else {
-      $sSQLCond .= ' datetime_log > "'.$_POST['time'].' "';
+      $sReprotSQL .= ' datetime_log > "'.$_POST['time'].' "';
     }
   }
+  if (isset($_POST['hiCity']) && !empty($_POST['hiCity'])) {
+    $sReprotSQL .= ' AND city_name IN("'.$_POST['hiCity'].'") ';
+  }
+  if (isset($_POST['hiArea']) && !empty($_POST['hiArea'])) {
+    $sReprotSQL .= ' AND postcode IN("'.$_POST['hiArea'].'") ';
+  }
+  if (isset($_POST['hiSchool']) && !empty($_POST['hiSchool'])) {
+    $sReprotSQL .= ' AND name IN("'.$_POST['hiSchool'].'") ';
+  }
+  $sReprotSQL .= " GROUP BY organization_id ORDER BY organization_id";
 
-  $sSQLCond .= " GROUP BY organization_id ORDER BY organization_id";
-
-  $oSQLCond = $dbh->prepare($sSQLCond);
-  $oSQLCond->execute();
-  $vReportData = $oSQLCond->fetchAll(\PDO::FETCH_ASSOC);
+  $oReprot = $dbh->prepare($sReprotSQL);
+  $oReprot->execute();
+  $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
 
   // Excel
   make_excel($vReportData);
@@ -171,7 +179,11 @@
   $vCiryArea = array();
   $vSchoolData = array();
 
-  foreach ($vReportData as $tmpData) {
+  $sSQLCond = "SELECT city_name, city_area, postcode, name FROM report_dailyusage ";
+  $oCond = $dbh->prepare($sSQLCond);
+  $oCond->execute();
+  $vCond = $oCond->fetchAll(\PDO::FETCH_ASSOC);
+  foreach ($vCond as $tmpData) {
     $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
     $vCiryArea[$tmpData['city_name']][] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
     $vSchoolData[$tmpData['city_name']][] = array($tmpData['postcode'], $tmpData['name']);
@@ -279,18 +291,24 @@ function make_excel($vReportData) {
   	  $("#setrange").attr("checked",true);
   	});
 
+    $('#hiCity').val(<?php echo $_POST['hiCity']; ?>);
+    $('#hiArea').val(<?php echo $_POST['hiArea']; ?>);
+    $('#hiSchool').val(<?php echo $_POST['hiSchool']; ?>);
+
     // 選擇縣市, 區及學校需變動
     $('#select_city').change(function() {
       if ('' === $('#select_city').val()) return
 
       // 區
       $("#select_zipcode").empty();
+      $('#select_zipcode').append($('<option>', {value:''}).text('區'));
       $.each(oCityArea[$('#select_city').val()], function(iInx, vData) {
         $('#select_zipcode').append($('<option>', {value:vData[0]}).text(vData[1]));
       });
 
       // 學校
       $("#select_school").empty();
+      $('#select_school').append($('<option>', {value:''}).text('學校'));
       $.each(oSchool[$('#select_city').val()], function(iInx, vData) {
         console.log(vData);
         if ($('#select_zipcode').val() === vData[0]) {
@@ -309,6 +327,7 @@ function make_excel($vReportData) {
 
       // 學校
       $("#select_school").empty();
+      $('#select_school').append($('<option>', {value:''}).text('學校'));
       $.each(oSchool[$('#select_city').val()], function(iInx, vData) {
         if ($('#select_zipcode').val() === vData[0]) {
           $('#select_school').append($('<option>', {value:vData[1]}).text(vData[1]));
@@ -325,7 +344,8 @@ function make_excel($vReportData) {
   table tbody {overflow:auto;height:750px;weight:50%;}
   #main_cond label {cursor:pointer;}
   #tab_indicator thead {cursor:pointer;}
-  #tab_indicator > * > * > *:nth-of-type(1) {min-width:100px;}
+  #tab_indicator > * > * > * {vertical-align:middle;}
+  #tab_indicator > * > * > *:nth-of-type(1) {min-width:105px;}
   #tab_indicator > * > * > *:nth-of-type(2) {width:85px;}
   #tab_indicator > * > * > *:nth-of-type(3) {width:85px;}
   #tab_indicator > * > * > *:nth-of-type(4) {width:230px;}
