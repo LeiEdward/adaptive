@@ -85,44 +85,44 @@
   $oExamView = $dbh->prepare('DROP VIEW EXAM_VIEW');
   $oExamView -> execute();
 
-  $vReportData = array();
+  $resultData = array();
   // 影片瀏覽人數
   foreach ($vVideoData as $sCol => $tmpVideo) {
-    $vReportData[$tmpVideo["organization_id"]]["postcode"] = $tmpVideo["postcode"];
-  	$vReportData[$tmpVideo["organization_id"]]["city_name"] = $tmpVideo["city_name"];
-  	$vReportData[$tmpVideo["organization_id"]]["schoolname"] = $tmpVideo["name"];
-  	$vReportData[$tmpVideo["organization_id"]]["video_p"] = $tmpVideo["num"];
+    $resultData[$tmpVideo["organization_id"]]["postcode"] = $tmpVideo["postcode"];
+  	$resultData[$tmpVideo["organization_id"]]["city_name"] = $tmpVideo["city_name"];
+  	$resultData[$tmpVideo["organization_id"]]["schoolname"] = $tmpVideo["name"];
+  	$resultData[$tmpVideo["organization_id"]]["video_p"] = $tmpVideo["num"];
   }
 
   //影片瀏覽時間4
   foreach ($vSpentTimeData as $sCol => $tmpSpentTime) {
-    $vReportData[$tmpSpentTime["organization_id"]]["postcode"] = $tmpSpentTime["postcode"];
-  	$vReportData[$tmpSpentTime["organization_id"]]["city_name"] = $tmpSpentTime["city_name"];
-  	$vReportData[$tmpSpentTime["organization_id"]]["schoolname"] = $tmpSpentTime["name"];
-  	$vReportData[$tmpSpentTime["organization_id"]]["video_t"] = round($tmpSpentTime["total_sec"]/3600,2);
+    $resultData[$tmpSpentTime["organization_id"]]["postcode"] = $tmpSpentTime["postcode"];
+  	$resultData[$tmpSpentTime["organization_id"]]["city_name"] = $tmpSpentTime["city_name"];
+  	$resultData[$tmpSpentTime["organization_id"]]["schoolname"] = $tmpSpentTime["name"];
+  	$resultData[$tmpSpentTime["organization_id"]]["video_t"] = round($tmpSpentTime["total_sec"]/3600,2);
   }
 
   //練習題測驗人數5
   foreach ($vPracData as $key => $tmpPrac){
-    $vReportData[$tmpPrac["organization_id"]]["postcode"] = $tmpPrac["postcode"];
-  	$vReportData[$tmpPrac["organization_id"]]["city_name"] = $tmpPrac["city_name"];
-  	$vReportData[$tmpPrac["organization_id"]]["schoolname"] = $tmpPrac["name"];
-  	$vReportData[$tmpPrac["organization_id"]]["prac"] = $tmpPrac["num"];
+    $resultData[$tmpPrac["organization_id"]]["postcode"] = $tmpPrac["postcode"];
+  	$resultData[$tmpPrac["organization_id"]]["city_name"] = $tmpPrac["city_name"];
+  	$resultData[$tmpPrac["organization_id"]]["schoolname"] = $tmpPrac["name"];
+  	$resultData[$tmpPrac["organization_id"]]["prac"] = $tmpPrac["num"];
   }
 
   // 測驗總人數
   foreach ($vExamViewData as $sCol => $tmpExam) {
-    $vReportData[$tmpExam["organization_id"]]["postcode"] = $tmpExam["postcode"];
-  	$vReportData[$tmpExam["organization_id"]]["city_name"] = $tmpExam["city_name"];
-  	$vReportData[$tmpExam["organization_id"]]["schoolname"] = $tmpExam["name"];
-  	$vReportData[$tmpExam["organization_id"]]["exam_total"] = $tmpExam["num"];
+    $resultData[$tmpExam["organization_id"]]["postcode"] = $tmpExam["postcode"];
+  	$resultData[$tmpExam["organization_id"]]["city_name"] = $tmpExam["city_name"];
+  	$resultData[$tmpExam["organization_id"]]["schoolname"] = $tmpExam["name"];
+  	$resultData[$tmpExam["organization_id"]]["exam_total"] = $tmpExam["num"];
   }
 
   // $sSQLUsage = $dbh->prepare("INSERT INTO
   //   report_dailyusage (sn, organization_id, city_name, postcode, city_area, name, exam_total, video_watching_total, video_spend_time, exercise_total, datetime_log)
   //   VALUES (NULL, :organization_id, :city_name, :postcode,:city_area, :name, :exam_total, :video_watching_total, :video_spend_time, :exercise_total, :datetime_log)");
   //
-  // foreach ($vReportData as $key=>$value) {
+  // foreach ($resultData as $key=>$value) {
   //   if($value["exam_total"]=='') $value["exam_total"]=0;
   //   if($value["video_p"]=='') $value["video_p"]=0;
   //   if($value["video_t"]=='') $value["video_t"]=0;
@@ -130,7 +130,7 @@
   //
   // 	$sSQLUsage->bindValue(':organization_id', $key, PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':city_name', $value["city_name"], PDO::PARAM_STR);
-  //  $sSQLUsage->bindValue(':postcode', $value["postcode"], PDO::PARAM_STR);
+  //   $sSQLUsage->bindValue(':postcode', $value["postcode"], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':city_area', $ref_cityarea[$value["postcode"]][1], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':name', $value["schoolname"], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':exam_total', $value["exam_total"], PDO::PARAM_STR);
@@ -170,9 +170,6 @@
   $oSQLCond->execute();
   $vReportData = $oSQLCond->fetchAll(\PDO::FETCH_ASSOC);
 
-  // Excel
-  make_excel($vReportData);
-
   foreach ($vReportData as $tmpData) {
     $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
     $vCiryArea[$tmpData['city_name']][] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
@@ -194,6 +191,23 @@
   $vCitySelect[] =   '<option value="學校">學校</option>';
   $vCitySelect[] = '</select>';
 
+  // Excel
+  make_excel($resultData);
+  function make_excel($resultData) {
+  	$date = date("Ymd_His");
+  	$excel_content[0]=["學校代碼","縣市","學校","測驗人數","影片瀏覽人數","影片瀏覽時間(小時)","練習題測驗人數"];
+  	foreach ($resultData as $key=>$value){
+  		$excel_content[$key+1] = [$key,$value["city_name"],$value["schoolname"],$value["exam_total"],$value["video_p"],$value["video_t"],$value["prac"]];
+  	}
+  	$objPHPExcel = new PHPExcel();
+  	$objPHPExcel->setActiveSheetIndex(0);
+  	$objPHPExcel->getActiveSheet()->fromArray($excel_content, null, 'A1');
+  	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
+  	$filename= 'use_dayilyusage.xlsx';
+  	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
+  	$objWriter->save(_ADP_PATH.'data/tmp/'.$filename);
+  }
+
   // 時間條件
   $sUserSearch = '';
 	if($_POST['time'] == '0000-00-00' || !isset($_POST['time'])) {
@@ -211,33 +225,6 @@
   else {
 		$sUserSearch = "指定區間".$_POST["search_start"]."~".$_POST["search_end"];
 	}
-
-  function make_excel($vReportData) {
-  	$date = date("Ymd_His");
-  	$excel_content[0] = array("學校代碼",
-                              "縣市",
-                              "學校",
-                              "測驗人數",
-                              "影片瀏覽人數",
-                              "影片瀏覽時間(小時)",
-                              "練習題測驗人數");
-  	foreach ($vReportData as $vData) {
-  		$excel_content[$vData['organization_id']] = array($vData['organization_id'],
-                                                        $vData["city_name"],
-                                                        $vData["name"],
-                                                        $vData["exam_total"],
-                                                        $vData["video_watching_total"],
-                                                        $vData["video_spend_time"],
-                                                        $vData["exercise_total"]);
-  	}
-  	$objPHPExcel = new PHPExcel();
-  	$objPHPExcel->setActiveSheetIndex(0);
-  	$objPHPExcel->getActiveSheet()->fromArray($excel_content, null, 'A1');
-  	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
-  	$filename= 'use_dayilyusage.xlsx';
-  	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
-  	$objWriter->save(_ADP_PATH.'data/tmp/'.$filename);
-  }
 ?>
 <!DOCTYPE HTML>
 <html>
@@ -344,7 +331,7 @@
 			    <input type="submit" name="sreach" class="btn02" style="width:70px; display: inline;" value="查詢">
 	      </form>
 		  <font class="color-blue">搜尋範圍：<?php echo $sUserSearch; ?></font>
-  		<div style="text-align:right;display:inline;"><a href="<?php echo './data/tmp/use_dayilyusage.xlsx';?>">檔案下載</a></div>
+  		<div style="text-align:right;display:inline;"><a href="<?php echo './data/tmp/use_chinese.xlsx';?>">檔案下載</a></div>
   		<div class="table_scroll" >
   			<table id="tab_indicator" class="datatable" data-sortable>
   				<thead>
@@ -361,22 +348,22 @@
   				</thead>
   				<tbody>
 <?php
-	//debug_msg("第".__LINE__."行 resultData ", $vReportData);
-  foreach ($vReportData as $key=>$value) {
+	//debug_msg("第".__LINE__."行 resultData ", $resultData);
+  foreach ($resultData as $key=>$value) {
 		if($value["exam_total"]=='') $value["exam_total"]=0;
 		if($value["video_p"]=='') $value["video_p"]=0;
 		if($value["video_t"]=='') $value["video_t"]=0;
 		if($value["prac"]=='') $value["prac"]=0;
 ?>
   					<tr>
-              <td><?php echo $value['organization_id']; ?></td>
+  						<td><?php echo $key; ?></td>
   						<td><?php echo $value["city_name"]; ?></td>
               <td><?php echo $ref_cityarea[$value["postcode"]][1]; ?></td>
-  						<td><?php echo $value["name"]; ?></td>
+  						<td><?php echo $value["schoolname"]; ?></td>
   						<td data-sortable-type="numeric"><?php echo $value["exam_total"]; ?></td>
-  						<td data-sortable-type="numeric"><?php echo $value["video_watching_total"]; ?></td>
-  						<td data-sortable-type="numeric"><?php echo $value["video_spend_time"]; ?></td>
-  						<td data-sortable-type="numeric"><?php echo $value["exercise_total"]; ?></td>
+  						<td data-sortable-type="numeric"><?php echo $value["video_p"]; ?></td>
+  						<td data-sortable-type="numeric"><?php echo $value["video_t"]; ?></td>
+  						<td data-sortable-type="numeric"><?php echo $value["prac"]; ?></td>
   					</tr>
 <?php } ?>
   			  </tbody>
