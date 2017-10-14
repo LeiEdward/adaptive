@@ -168,6 +168,7 @@
   }
   $sReprotSQL .= " GROUP BY organization_id ORDER BY organization_id";
 
+
   $oReprot = $dbh->prepare($sReprotSQL);
   $oReprot->execute();
   $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
@@ -178,15 +179,17 @@
   $vCityData = array();
   $vCiryArea = array();
   $vSchoolData = array();
-
   $sSQLCond = "SELECT city_name, city_area, postcode, name FROM report_dailyusage ";
+  if ('41' == $sUserLevel) {
+    $sSQLCond .=  "WHERE city_name IN('$sManageCity') ";
+  }
   $oCond = $dbh->prepare($sSQLCond);
   $oCond->execute();
   $vCond = $oCond->fetchAll(\PDO::FETCH_ASSOC);
   foreach ($vCond as $tmpData) {
     $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
-    $vCiryArea[$tmpData['city_name']][] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
-    $vSchoolData[$tmpData['city_name']][] = array($tmpData['postcode'], $tmpData['name']);
+    $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
+    $vSchoolData[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['name']);
   }
 
   // 縣市
@@ -199,7 +202,7 @@
     }
   }
   $vCitySelect[] = '</select>';
-  $vCitySelect[] = '<select id="select_zipcode">';
+  $vCitySelect[] = '<select id="select_area">';
   $vCitySelect[] =   '<option value="區">區</option>';
   $vCitySelect[] = '</select>';
   $vCitySelect[] = '<select id="select_school">';
@@ -276,6 +279,10 @@ function make_excel($vReportData) {
 <script>
   var oCityArea = $.parseJSON('<?php echo json_encode($vCiryArea); ?>');
   var oSchool = $.parseJSON('<?php echo json_encode($vSchoolData); ?>');
+  var oUserSelect = {};
+  oUserSelect.city = '<?php echo $_POST['hiCity']; ?>';
+  oUserSelect.area = '<?php echo $_POST['hiArea']; ?>';
+  oUserSelect.school = '<?php echo $_POST['hiSchool']; ?>';
 
 	$(function() {
     $("table").children("thead").find("td,th").each(function(){
@@ -296,52 +303,56 @@ function make_excel($vReportData) {
       if ('' === $('#select_city').val()) return
 
       // 區
-      $("#select_zipcode").empty();
-      $('#select_zipcode').append($('<option>', {value:''}).text('區'));
+      $("#select_area").empty();
+      $('#select_area').append($('<option>', {value:''}).text('區'));
       $.each(oCityArea[$('#select_city').val()], function(iInx, vData) {
-        $('#select_zipcode').append($('<option>', {value:vData[0]}).text(vData[1]));
+        $('#select_area').append($('<option>', {value:vData[0]}).text(vData[1]));
       });
 
       // 學校
       $("#select_school").empty();
       $('#select_school').append($('<option>', {value:''}).text('學校'));
       $.each(oSchool[$('#select_city').val()], function(iInx, vData) {
-        console.log(vData);
-        if ($('#select_zipcode').val() === vData[0]) {
+        if ($('#select_area').val() === vData[0]) {
           $('#select_school').append($('<option>', {value:vData[1]}).text(vData[1]));
         }
       });
 
       $('#hiCity').val($('#select_city').val());
-      $('#hiArea').val($('#select_zipcode').val());
+      $('#hiArea').val($('#select_area').val());
       $('#hiSchool').val($('#select_school').val());
     });
 
     // 選擇區 學校需變動
-    $('#select_zipcode').change(function() {
-      if ('' === $('#select_zipcode').val()) return
+    $('#select_area').change(function() {
+      if ('' === $('#select_area').val()) return
 
       // 學校
       $("#select_school").empty();
       $('#select_school').append($('<option>', {value:''}).text('學校'));
       $.each(oSchool[$('#select_city').val()], function(iInx, vData) {
-        if ($('#select_zipcode').val() === vData[0]) {
+        if ($('#select_area').val() === vData[0]) {
           $('#select_school').append($('<option>', {value:vData[1]}).text(vData[1]));
         }
         $('#hiSchool').val($('#select_school').val());
       });
 
-      $('#hiArea').val($('#select_zipcode').val());
+      $('#hiArea').val($('#select_area').val());
     });
 
-    $("#hiCity").children().each(function() {
-        if ($(this).text() == "<?php echo $_POST['hiCity']; ?>") {
-          $(this).attr("selected", true);
-        }
-    });
-    // $('#hiCity').val('<?php echo $_POST['hiCity']; ?>');
-    // $('#hiArea').val('<?php echo $_POST['hiArea']; ?>');
-    // $('#hiSchool').val('<?php echo $_POST['hiSchool']; ?>');
+    // if ('' !== oUserSelect.city) {
+    //   $('#select_city').val(oUserSelect.city);
+    //   $('#hiCity').val(oUserSelect.city);
+    // }
+    // if ('' !== oUserSelect.area) {
+    //   $('#select_area').val(oUserSelect.area);
+    //   $('#hiArea').val(oUserSelect.area);
+    // }
+    // if ('' !== oUserSelect.school) {
+    //   $('#select_school').val(oUserSelect.school);
+    //   $('#hiSchool').val(oUserSelect.school);
+    // }
+
 	});
 </script>
 <style>
