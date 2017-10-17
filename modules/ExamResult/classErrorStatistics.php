@@ -1,10 +1,10 @@
 
 <script type="text/javascript">
-$(document).ready(function(){	
+$(document).ready(function(){
     		$("td[id*=all_]").on( "click", function(){
-        		
+
     	 		var id_split = $(this).attr("id").split("_");
-    	 		
+
     	  		var user_id = id_split[1];
     	  		var btnS = $(this).html().split(" ");
     	  		console.log(btnS);
@@ -45,7 +45,7 @@ if($_REQUEST['set_opt']==''){
 	$_REQUEST['set_opt']="classExamResults";  //預設值
 }
 // if($_REQUEST['output_excel']==1){
-//   make_excel($_REQUEST['class_ep']);  
+//   make_excel($_REQUEST['class_ep']);
 // }
 listCLASSandCS($_REQUEST['set_opt']);
 
@@ -92,7 +92,7 @@ function listCLASSandCS($set_opt){
 				$select3[$se][$cc][$oi]=id2org($oi);
 				$select4[$se][$cc][$oi][$gc]="$gr 年 $cl 班";
 			}
-				
+
 		}else{
 			$sql = '
     		select distinct city_code, organization_id, grade, class
@@ -134,7 +134,7 @@ function listCLASSandCS($set_opt){
        <div class="main-box">
             <div class="left-box discuss-select">
 				<a href="modules.php?op=modload&name=ExamResult&file=classErrorStatistics&set_opt=classErrorStatistics" class="btn02">班級學習狀態</a>
-        		<a href="modules.php?op=modload&name=ExamResult&file=classesInfo_teacher" class="btn02">班級節點狀態</a>       
+        		<a href="modules.php?op=modload&name=ExamResult&file=classesInfo_teacher" class="btn02">班級節點狀態</a>
 				<a href="modules.php?op=modload&name=ExamResult&file=classReports" class="btn02">學生診斷報告</a>
 				<a href="modules.php?op=modload&name=learn_video&file=video_report_list" class="btn02">影片瀏覽報告</a>
             </div>
@@ -176,7 +176,7 @@ $bNodeTmpAry = array();
 // print_r($ind_row);
 
 function classErrorStatistics($class_ep){
-	
+	// $class_ep Array ( [0] => 1061 [1] => 19 [2] => 190041 [3] => 6@XX@1 )
 	global $dbh;
 	$seme=$class_ep[0];
 	$city=$class_ep[1];
@@ -189,19 +189,19 @@ function classErrorStatistics($class_ep){
 	$sql='
 				SELECT *
 				FROM seme_student a, user_status b
-				WHERE a.organization_id="'.$organization.'" AND a.grade="'.$grade.'" AND a.class="'.$class.'" AND a.seme_year_seme="'.$seme.'"  AND a.stud_id=b.user_id 
+				WHERE a.organization_id="'.$organization.'" AND a.grade="'.$grade.'" AND a.class="'.$class.'" AND a.seme_year_seme="'.$seme.'"  AND a.stud_id=b.user_id
 				ORDER BY seme_year_seme, grade, class
 			';
 	$re = $dbh->query($sql);
 	$classInfo =$re->rowCount();
-	
+
 	$ind_row=array();
 	$indicate=$dbh->query("SELECT indicate_name, indicate_id FROM `map_node`");
 	while($indicate_row=$indicate->fetch() ){
 		$ind_row[$indicate_row[indicate_id]]=$indicate_row[indicate_name];
-	
+
 	}
-	
+
 	if($classInfo>0){
 	while($data=$re->fetch()){
 		$grade = $data[grade];
@@ -215,17 +215,17 @@ function classErrorStatistics($class_ep){
 				FROM map_node_student_status , map_info
 				WHERE map_node_student_status.user_id="'.$user.'"  AND map_node_student_status.map_sn=map_info.map_sn
 			';
-		
+
 	$re_nodeStatus=$dbh->query( $sql_nodeStatus );
 	$allnode_pass=0;
 	$Allnode_num=0;
 	$allnode_nopass=0;
 	$pass_node='';
-	
+
 	while($data_nodeStatus = $re_nodeStatus->fetch()){
-		
+
 		$subject=$data_nodeStatus[subject_id];
-		
+
 		$bNodeS = unserialize( $data_nodeStatus[bNodes_Status] );
 		$sNodeS = unserialize( $data_nodeStatus[sNodes_Status_FR] );
 
@@ -249,7 +249,7 @@ function classErrorStatistics($class_ep){
 					}else{
 						$pass_node[$user][$subject][$bNodeAry[0]].='<div class="tooltip">'.$key.'<span class="tooltiptext" style=" padding-left: 5px; padding-right: 5px;">'.$ind_row["$key"].'</span></div>,';
 					}
-					
+
 					if( !in_array( $subject, $sub_ary ) ){
 						$sub_ary[]=$subject;
 					}
@@ -287,7 +287,7 @@ function classErrorStatistics($class_ep){
 	if($Allnode_num==0) $Allnode_num=1;
 	$passPer = round(($allnode_pass/$Allnode_num) * 100);
 	$noPassPer = round(($allnode_nopass/$Allnode_num) * 100);
-	
+
 
 	$nodeHtml[$user]='
 			<tr>
@@ -296,7 +296,7 @@ function classErrorStatistics($class_ep){
 				<td> <div class="progress progress-success" style="margin-bottom: 0px; height: 36px; "><div class="bar"  style="width:'.$passPer.'%; background-image: linear-gradient(to bottom, #00AA00, #46dd46);"><span style="color: rgba(93, 93, 93, 0.97);font-size: 17px;">('.$passPer.'%)</span>
 					</div>
 					</div>
-		
+
 		';
 
 	foreach($sub_ary as $subject ){
@@ -319,8 +319,8 @@ function classErrorStatistics($class_ep){
 					<td> '.$grade.'
 					<td style="text-align: left;">'.$pass_node[$user][$subject][$grade].'
 					<td style="text-align: left;">'.$nopass_node[$user][$subject][$grade].'
-							
-							
+
+
 							';
 		}
 		$tmp3[]='</table>';
@@ -330,7 +330,7 @@ function classErrorStatistics($class_ep){
 				                <td style="text-align: center;"> '.$sub_nm.'
 				                <td> <div class="progress progress-info" style="margin-bottom: 0px; height: 36px;">
 				<div class="bar" data-title="tips_html" style="width:'.$sub_passper[$subject].'%; background-image: linear-gradient(to bottom, #09c, #4ec5ed);">
-							<a class="venoboxinline"  data-title="節點狀態"  data-gall="gall-frame2" data-type="inline"  href="#inline-content'.$user.$subject.'"> 
+							<a class="venoboxinline"  data-title="節點狀態"  data-gall="gall-frame2" data-type="inline"  href="#inline-content'.$user.$subject.'">
 							<span style="color: rgba(93, 93, 93, 0.97);font-size: 17px;">'.$user_node[$user][$subject][pass].'('.$sub_passper[$subject].'%) </span></div>
 				            </a></div></div>
 							<div id="inline-content'.$user.$subject.'" class="personal-inline">'.implode('',$tmp3).'</div>
@@ -340,9 +340,9 @@ function classErrorStatistics($class_ep){
 			unset($tmp3);
 			unset($row);
 	}
-	
+
 // 	unset($sub_ary);
-	
+
 	}
 	ksort($nodeHtml);
 	$reportHtml[]='<br><div>';
@@ -377,7 +377,7 @@ function sub_name($sub) {
 ?>
 
 
-    
+
 <style>
 .tooltip {
     position: relative;
