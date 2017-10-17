@@ -1,192 +1,222 @@
 <?php
-include_once('include/config.php');
-require_once('feet.php');
-include_once('classes/PHPExcel.php');
+  include_once('include/config.php');
+  include_once('classes/PHPExcel.php');
+  include_once('include/ref_cityarea.php');
 
-function classErrorStatistics($class_ep) {
-	global $dbh;
-  // $class_ep Array ( [0] => 1061 [1] => 19 [2] => 190041 [3] => 6@XX@1 )
-	$seme=$class_ep[0];
-	$city=$class_ep[1];
-	$organization=$class_ep[2];
-	$school_name=id2city($city).'-'.id2org($organization);
-	$grade_class = $class_ep[3];
-	$gc=explode("@XX@",$grade_class);
-	$grade=$gc[0];
-	$class=$gc[1];
-	$sql='
-				SELECT *
-				FROM seme_student a, user_status b
-				WHERE a.organization_id="'.$organization.'" AND a.grade="'.$grade.'" AND a.class="'.$class.'" AND a.seme_year_seme="'.$seme.'"  AND a.stud_id=b.user_id
-				ORDER BY seme_year_seme, grade, class
-			';
-	$re = $dbh->query($sql);
-	$classInfo =$re->rowCount();
+  if (!isset($_SESSION)) {
+    session_start();
+  }
 
-	$ind_row=array();
-	$indicate=$dbh->query("SELECT indicate_name, indicate_id FROM `map_node`");
-	while($indicate_row=$indicate->fetch() ){
-		$ind_row[$indicate_row[indicate_id]]=$indicate_row[indicate_name];
-	}
+  // 取得 user 資料
+  $vUserData = get_object_vars($_SESSION['user_data']);
+  $sUserLevel = $vUserData['access_level'];
+  $sManageCity = $vUserData['city_name'];
+  $sOrganization = $vUserData['organization_id'];
+  $sSemeYear = $vUserData['semeYear'];
+  $sCityCode = $vUserData['city_code'];
 
-	if($classInfo>0){
-	while($data=$re->fetch()){
-		$grade = $data[grade];
-		$classes = $data['class'];
-		$user=$data[user_id];
-		$sub_ary = array();
-		$node_g=array();
+  // 查詢條件設定
+  getUserACL($sUserLevel, $sManageCity);
 
-		$sql_nodeStatus='
-				SELECT *
-				FROM map_node_student_status , map_info
-				WHERE map_node_student_status.user_id="'.$user.'"  AND map_node_student_status.map_sn=map_info.map_sn
-			';
+  // 依地區搜尋條件
+  $sCitySelect = getSelector($vCityData);
 
-	$re_nodeStatus=$dbh->query( $sql_nodeStatus );
-	$allnode_pass=0;
-	$Allnode_num=0;
-	$allnode_nopass=0;
-	$pass_node='';
+  // 整理資料, 統一變數傳至HTML
+  $sJSOject = arraytoJS(array('City' => $vCityData,
+                              'CityArea' => $vCiryArea,
+                              'School' => $vSchool,
+                              'UserCond' => $sUserSearch,
+                              'CondCity' => $_POST['hiCity'],
+                              'CondArea' => $_POST['hiArea'],
+                              'CondSchool' => $_POST['hiSchool'],
+                              'Chart' => $vChart
+                      ));
 
-	while($data_nodeStatus = $re_nodeStatus->fetch()){
+function getUserACL($sUserLevel, $sManageCity) {
+  global $dbh, $vCityData, $vCiryArea, $vSchool;
 
-		$subject=$data_nodeStatus[subject_id];
-
-		$bNodeS = unserialize( $data_nodeStatus[bNodes_Status] );
-		$sNodeS = unserialize( $data_nodeStatus[sNodes_Status_FR] );
-
-		if( !is_array($sNodeS) ){
-			debugBAI(__LINE__,__FILE__, 'sNodes is null. '.$user);
-			continue;
-		}
-		foreach ($sNodeS as $key =>$value){
-			$bNodeAry = sNode2bNode($key,$subject);
-			$Node_grade= $bNodeAry[0];
-			if(isset($value['status:'])){
-				if( $value['status:']==1 ){
-					$Allnode_num++;
-					$allnode_pass++;
-					$user_node[$user][$subject][pass]++;
-					$user_node[$user][$subject][all_node]++;
-					if(substr($pass_node[$user][$subject][$bNodeAry[0]], -1)=='<br>'){
-						$pass_node[$user][$subject][$bNodeAry[0]].='<div class="tooltip">'.$key.'<span class="tooltiptext" style=" padding-left: 5px; padding-right: 5px;">'.$ind_row["$key"].'</span></div>,';
-					}elseif(substr($pass_node[$user][$subject][$bNodeAry[0]], -1)==','){
-						$pass_node[$user][$subject][$bNodeAry[0]].='&nbsp;<div class="tooltip">'.$key.'<span class="tooltiptext" style=" padding-left: 5px; padding-right: 5px;">'.$ind_row["$key"].'</span></div><br>';
-					}else{
-						$pass_node[$user][$subject][$bNodeAry[0]].='<div class="tooltip">'.$key.'<span class="tooltiptext" style=" padding-left: 5px; padding-right: 5px;">'.$ind_row["$key"].'</span></div>,';
-					}
-
-					if( !in_array( $subject, $sub_ary ) ){
-						$sub_ary[]=$subject;
-					}
-					if($Node_grade!=''){
-						$node_g_keys=$node_g[$subject];
-						if( ($node_g_keys==null) ||  !in_array( $Node_grade, $node_g[$subject] ) ){
-							$node_g[$subject][]=$Node_grade;
-						}
-					}
-				}elseif($value['status:']==0){
-					$Allnode_num++;
-					$allnode_nopass++;
-					$user_node[$user][$subject][nopass]++;
-					$user_node[$user][$subject][all_node]++;
-					if(substr($nopass_node[$user][$subject][$bNodeAry[0]], -1)=='<br>'){
-						$nopass_node[$user][$subject][$bNodeAry[0]].='<div class="tooltip">'.$key.'<span class="tooltiptext" style=" padding-left: 5px; padding-right: 5px;">'.$ind_row["$key"].'</span></div>,';
-					}elseif(substr($nopass_node[$user][$subject][$bNodeAry[0]], -1)==','){
-						$nopass_node[$user][$subject][$bNodeAry[0]].='&nbsp;<div class="tooltip">'.$key.'<span class="tooltiptext" style=" padding-left: 5px; padding-right: 5px;">'.$ind_row["$key"].'</span></div><br>';
-					}else{
-						$nopass_node[$user][$subject][$bNodeAry[0]].='<div class="tooltip">'.$key.'<span class="tooltiptext" style=" padding-left: 5px; padding-right: 5px;">'.$ind_row["$key"].'</span></div>,';
-					}
-					if( !in_array( $subject, $sub_ary ) ){
-						$sub_ary[]=$subject;
-					}
-					if($Node_grade!=''){
-						$node_g_keys=$node_g[$subject];
-						if(($node_g_keys==null) || !in_array( $Node_grade, $node_g[$subject] ) ){
-							$node_g[$subject][]=$Node_grade;
-						}
-					}
-				}
-			}
-		}
-	}
-	if($Allnode_num==0) $Allnode_num=1;
-	$passPer = round(($allnode_pass/$Allnode_num) * 100);
-	$noPassPer = round(($allnode_nopass/$Allnode_num) * 100);
-
-
-	$nodeHtml[$user]='
-			<tr>
-				<td> '.id2uname($user).'
-				<td id= "all_'.$user.'" style="text-align: center; cursor: pointer;">＋ 全科目
-				<td> <div class="progress progress-success" style="margin-bottom: 0px; height: 36px; "><div class="bar"  style="width:'.$passPer.'%; background-image: linear-gradient(to bottom, #00AA00, #46dd46);"><span style="color: rgba(93, 93, 93, 0.97);font-size: 17px;">('.$passPer.'%)</span>
-					</div>
-					</div>
-
-		';
-
-	foreach($sub_ary as $subject ){
-		$sub_nm=sub_name($subject);
-		$sub_nopassper[$subject]=round(($user_node[$user][$subject][nopass]/$user_node[$user][$subject][all_node]) * 100);
-		$sub_passper[$subject]=round(($user_node[$user][$subject][pass]/$user_node[$user][$subject][all_node]) * 100);
-		$tmp3[]='';
-		$tmp3[]= '
-		'.id2uname($user).'&nbsp;&nbsp;&nbsp;'.$sub_nm;
-		$tmp3[]='<table class="datatable datatable-l">';
-		$tmp3[]='<tr>';
-		$tmp3[]='<th  style="width:20%;">年級  <th  style="width:40%;">精熟節點<th  style="width:40%;">未精熟節點' ;
-		$row=array();
-		foreach($node_g[$subject] as $grade ){
-			$row[]=$grade;
-		}
-		arsort($row);
-		foreach($row as $grade ){
-			$tmp3[].='<tr>
-					<td> '.$grade.'
-					<td style="text-align: left;">'.$pass_node[$user][$subject][$grade].'
-					<td style="text-align: left;">'.$nopass_node[$user][$subject][$grade].'
-
-
-							';
-		}
-		$tmp3[]='</table>';
-		$nodeHtml[$user].='
-					<tr class="gray sub_'.$user.$subject.'" style="display:none;" >
- 							    <td>
-				                <td style="text-align: center;"> '.$sub_nm.'
-				                <td> <div class="progress progress-info" style="margin-bottom: 0px; height: 36px;">
-				<div class="bar" data-title="tips_html" style="width:'.$sub_passper[$subject].'%; background-image: linear-gradient(to bottom, #09c, #4ec5ed);">
-							<a class="venoboxinline"  data-title="節點狀態"  data-gall="gall-frame2" data-type="inline"  href="#inline-content'.$user.$subject.'">
-							<span style="color: rgba(93, 93, 93, 0.97);font-size: 17px;">'.$user_node[$user][$subject][pass].'('.$sub_passper[$subject].'%) </span></div>
-				            </a></div></div>
-							<div id="inline-content'.$user.$subject.'" class="personal-inline">'.implode('',$tmp3).'</div>
-				            ';
-
-// 		}
-			unset($tmp3);
-			unset($row);
-	}
-
-// 	unset($sub_ary);
-
-	}
-	ksort($nodeHtml);
-	$reportHtml[]='<br><div>';
-  $reportHtml[]='<div class="table_scroll">';
-	$reportHtml[]='
-		<h3>
-			全班人數:'.$classInfo.' 人
-		</h3>
-	';
-  $reportHtml[]='<table class="datatable datatable-l">';
-  //$reportHtml[]='<td>';
-  //$reportHtml[]='<td>學校：'.$userData->organization_name.' <td>班級：'.$userData->cht_class.' <td>總人數:'.$useData[stuNum].' <td> ';
-  $reportHtml[]='<tr>';
-  $reportHtml[]='<th  style="width:20%;">姓名  <th  style="width:30%;">科目<th  style="width:50%;">學習情形：通過節點數(節點通過率%)' ;//通過人數(通過人數/施測人數)
-  $reportHtml[]=implode('',$nodeHtml);
-  $reportHtml[]='</table>';
-  $reportHtml[]='</div></div>';
-	echo implode('',$reportHtml);
-	}else echo "此班級無學生！";
+  $vSchool = array();
+  $vCityData = array();
+  $vCiryArea = array();
+  $sSQLCond = "SELECT city_name, city_area, postcode, name FROM report_dailyusage ";
+  if ('41' == $sUserLevel) {
+    $sSQLCond .=  "WHERE city_name IN('$sManageCity') ";
+  }
+  $oCond = $dbh->prepare($sSQLCond);
+  $oCond->execute();
+  $vCond = $oCond->fetchAll(\PDO::FETCH_ASSOC);
+  foreach ($vCond as $tmpData) {
+    $vSchool[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['name']);
+    $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
+    $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
+  }
 }
+
+function getSelector($vCityData) {
+  $vCitySelect = array();
+  $vCitySelect[] = '<select id="select_city">';
+  $vCitySelect[] =   '<option value="">縣市</option>';
+  if (!empty($vCityData)) {
+    foreach ($vCityData as $tmpData) {
+      $vCitySelect[] = '<option value="'.$tmpData.'">'.$tmpData.'</option>';
+    }
+  }
+  $vCitySelect[] = '</select>';
+  $vCitySelect[] = '<select id="select_area">';
+  $vCitySelect[] =   '<option value="區">區</option>';
+  $vCitySelect[] = '</select>';
+  $vCitySelect[] = '<select id="select_school">';
+  $vCitySelect[] =   '<option value="學校">學校</option>';
+  $vCitySelect[] = '</select>';
+
+  return implode('', $vCitySelect);
+}
+
+function arraytoJS($vData) {
+  $sJSOject = array();
+  if(!empty($vData) && is_array($vData)) {
+     $sJSOject = json_encode($vData);
+  }
+  return $sJSOject;
+}
+?>
+<!DOCTYPE HTML>
+<html>
+<header>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/echarts-all-3.js"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts-stat/ecStat.min.js"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/dataTool.min.js"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/china.js"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/world.js"></script>
+<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=ZUONbpqGBsYGXNIYHicvbAbM"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/bmap.min.js"></script>
+</header>
+<script>
+  var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
+  var oUserSelect = {
+    cond: oItem.UserCond,
+    city: oItem.CondCity,
+    area: oItem.CondArea,
+    school: (!!oItem.CondSchool && '' !== oItem.CondSchool) ? oItem.CondSchool : '全部學校'
+  };
+
+	$(function() {
+
+    $("#search_start").click(function() {
+  	  $("#setrange").attr("checked",true);
+  	});
+    $("#search_end").click(function() {
+  	  $("#setrange").attr("checked",true);
+  	});
+
+    // 選擇縣市, 區及學校需變動
+    $('#select_city').change(function() {
+      if ('' === $('#select_city').val()) return
+
+      // 區
+      $("#select_area").empty();
+      $('#select_area').append($('<option>', {value:''}).text('區'));
+      $.each(oItem.CityArea[$('#select_city').val()], function(iInx, vData) {
+        $('#select_area').append($('<option>', {value:vData[1]}).text(vData[1]));
+      });
+
+      // 學校
+      $("#select_school").empty();
+      $('#select_school').append($('<option>', {value:''}).text('學校'));
+      $.each(oItem.School[$('#select_city').val()], function(iInx, vData) {
+        if ($('#select_area').val() === vData[0]) {
+          $('#select_school').append($('<option>', {value:vData[1]}).text(vData[1]));
+        }
+      });
+
+      $('#hiCity').val($('#select_city').val());
+      $('#hiArea').val($('#select_area').val());
+      $('#hiSchool').val($('#select_school').val());
+    });
+
+    // 選擇區 學校需變動
+    $('#select_area').change(function() {
+      if ('' === $('#select_area').val()) return
+
+      // 學校
+      $("#select_school").empty();
+      $('#select_school').append($('<option>', {value:''}).text('學校'));
+      $.each(oItem.School[$('#select_city').val()], function(iInx, vData) {
+        if ($('#select_area').val() === vData[1]) {
+          $('#select_school').append($('<option>', {value:vData[2]}).text(vData[2]));
+        }
+      });
+      $('#hiSchool').val($('#select_school').val());
+      $('#hiArea').val($('#select_area').val());
+    });
+
+    // 學校
+    $('#select_school').change(function() {
+      if ('' === $('#select_school').val()) return
+      $('#hiSchool').val($('#select_school').val());
+    });
+
+    // if ('' !== oUserSelect.city) {
+    //   $('#select_city').val(oUserSelect.city);
+    //   $('#hiCity').val(oUserSelect.city);
+    // }
+    // if ('' !== oUserSelect.area) {
+    //   $('#select_area').val(oUserSelect.area);
+    //   $('#hiArea').val(oUserSelect.area);
+    // }
+    // if ('' !== oUserSelect.school) {
+    //   $('#select_school').val(oUserSelect.school);
+    //   $('#hiSchool').val(oUserSelect.school);
+    // }
+
+	});
+</script>
+<style>
+  #main_cond label {cursor:pointer;}
+  #tab_indicator thead {cursor:pointer;}
+  #tab_indicator > * > * > * {vertical-align:middle;}
+  #tab_indicator > * > * > *:nth-of-type(1) {min-width:105px;}
+  #tab_indicator > * > * > *:nth-of-type(2) {width:85px;}
+  #tab_indicator > * > * > *:nth-of-type(3) {width:85px;}
+  #tab_indicator > * > * > *:nth-of-type(4) {width:230px;}
+  #tab_indicator > * > * > *:nth-of-type(5) {width:130px;}
+  #tab_indicator > * > * > *:nth-of-type(6) {width:130px;}
+  #tab_indicator > * > * > *:nth-of-type(7) {width:130px;}
+  #tab_indicator > * > * > *:nth-of-type(8) {width:135px;}
+  #tab_indicator > * > * > *:nth-of-type(9) {width:130px;}
+</style>
+  <div class="content2-Box">
+	  <div class="path">目前位置：系統使用狀況報表</div>
+      <div class="choice-box">
+        <div class="choice-title">報表</div>
+          <ul class="choice work-cholic">
+        	  <li><a href="modules.php?op=modload&name=schoolReport&file=report_dailyusage"><i class="fa fa-caret-right"></i>各校使用狀況</a></li>
+        		<li><a href="modules.php?op=modload&name=schoolReport&file=report_learningeffect" class="current"><i class="fa fa-caret-right"></i>各校學習狀況</a></li>
+          </ul>
+   		 </div>
+      <div class="left-box">
+        依定區搜尋
+<?php echo $sCitySelect; ?>
+      </div>
+ 			<div class="right-box">
+			  <form id="main_cond" method="post" action="modules.php?op=modload&name=schoolReport&file=report_dailyusage">
+			    <label><input type="radio" name="time" value="0000-00-00" checked>全部時間</label>
+			    <label><input type="radio" name="time" value="<?php echo date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-7, date("Y")));?>">最近一週</label>
+			    <label><input type="radio" name="time" value="<?php echo date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-14, date("Y")));?>">最近兩週</label>
+			    <label><input type="radio" name="time" value="<?php echo date( "Y-m-d", mktime (0,0,0,date("m")-1 ,date("d"), date("Y")));?>">最近一個月</label>
+			    <label><input type="radio"  id="setrange" name="time" value="search">指定區間</label>
+			    <input type="date" placeholder="yyyy/mm/dd" style="width:180px" id="search_start" name="search_start" value="<?php echo $search_start;?>">～
+      	  <input type="date" placeholder="yyyy/mm/dd" style="width:180px" id="search_end" name="search_end" value="<?php echo $search_end;?>">
+          <input type="hidden" id="hiCity" name="hiCity">
+          <input type="hidden" id="hiArea" name="hiArea">
+          <input type="hidden" id="hiSchool" name="hiSchool">
+			    <input type="submit" name="sreach" class="btn02" style="width:70px; display: inline;" value="查詢">
+	      </form>
+		  <font class="color-blue">搜尋範圍：<?php echo $sUserSearch; ?></font>
+  		<div style="text-align:right;display:inline;"><a href="<?php echo './data/tmp/use_dayilyusage.xlsx';?>" style="text-decoration:underline;">檔案下載</a></div>
+  		<div id="main_chart" style="height:700px;"></div>
+      <div id="school_people"></div>
+      <div id="school_time"></div>
+    </div>
+  </div>
+</html>

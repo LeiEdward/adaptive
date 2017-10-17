@@ -109,10 +109,16 @@
   }
 
   // 新增資料至 report_dailyusage Table
+  $vUserData = get_object_vars($_SESSION['user_data']);
+  $sUserLevel = $vUserData['access_level'];
+  $sManageCity = $vUserData['city_name'];
+  $sSemeYear = $vUserData['semeYear'];
+
+  getLearningStat($vReportData, $sSemeYear);
 
   // $sSQLUsage = $dbh->prepare("INSERT INTO
-  //   report_dailyusage (sn, organization_id, city_name, postcode, city_area, name, exam_total, video_watching_total, video_spend_time, exercise_total, datetime_log)
-  //   VALUES (NULL, :organization_id, :city_name, :postcode,:city_area, :name, :exam_total, :video_watching_total, :video_spend_time, :exercise_total, :datetime_log)");
+  //   report_dailyusage (sn, organization_id, city_name, postcode, city_area, name, exam_total, video_watching_total, video_spend_time, exercise_total, node, datetime_log)
+  //   VALUES (NULL, :organization_id, :city_name, :postcode,:city_area, :name, :exam_total, :video_watching_total, :video_spend_time, :exercise_total, :node, :datetime_log)");
   //
   // foreach ($vReportData as $key=>$value) {
   //   if($value['exam_total']=='') $value['exam_total']=0;
@@ -122,24 +128,20 @@
   //
   // 	$sSQLUsage->bindValue(':organization_id', $key, PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':city_name', $value['city_name'], PDO::PARAM_STR);
-  //  $sSQLUsage->bindValue(':postcode', $value['postcode'], PDO::PARAM_STR);
+  //   $sSQLUsage->bindValue(':postcode', $value['postcode'], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':city_area', $ref_cityarea[$value['postcode']][1], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':name', $value['schoolname'], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':exam_total', $value['exam_total'], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':video_watching_total', $value['video_p'], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':video_spend_time', $value['video_t'], PDO::PARAM_STR);
   // 	$sSQLUsage->bindValue(':exercise_total', $value['prac'], PDO::PARAM_STR);
+  //   $sSQLUsage->bindValue(':node', $value['node'], PDO::PARAM_STR);
   //   $sSQLUsage->bindValue(':datetime_log', date("Y-m-d, H:i:s"), PDO::PARAM_STR);
   // 	$sSQLUsage->execute();
   // }
   //-------------------------------------------------------------------------------------------------------------------
 
-  $vUserData = get_object_vars($_SESSION['user_data']);
-  $sUserLevel = $vUserData['access_level'];
-  $sManageCity = $vUserData['city_name'];
-  $sFindData = '*'; // 資料分類
-
-  $sReprotSQL = "SELECT $sFindData FROM report_dailyusage ";
+  $sReprotSQL = "SELECT * FROM report_dailyusage ";
   switch ($sUserLevel) {
     case '41': // 縣市政府
       $sReprotSQL .= "WHERE city_name IN('$sManageCity') ";
@@ -187,7 +189,7 @@
   make_excel($vReportData);
 
   // 查詢條件設定
-  getUserACL($sUserLevel);
+  getUserACL($sUserLevel, $sManageCity);
 
   // 依地區搜尋條件
   $sCitySelect = getSelector($vCityData);
@@ -206,8 +208,8 @@
                   'Chart' => $vChart
           ));
 
-function getUserACL($sUserLevel) {
-  global $dbh, $vCityData, $vCiryArea, $vSchool, $sManageCity;
+function getUserACL($sUserLevel, $sManageCity) {
+  global $dbh, $vCityData, $vCiryArea, $vSchool;
 
   $vSchool = array();
   $vCityData = array();
@@ -304,6 +306,67 @@ function arraytoJS($vData) {
   if(!empty($vData) && is_array($vData)) {
     $sJSOject = json_encode($vData);
   }
+}
+
+function getLearningStat(&$vReportData, $sSemeYear) {
+	global $dbh;
+
+  // 查出該校的所有學生
+  $sql = 'SELECT *
+		FROM seme_student a, user_status b
+		WHERE a.seme_year_seme = "'.$sSemeYear.'" AND a.stud_id=b.user_id
+		ORDER BY seme_year_seme, grade, class';
+	$re = $dbh->query($sql);
+	$classInfo = $re->rowCount();
+
+	$ind_row=array();
+	$indicate=$dbh->query("SELECT indicate_name, indicate_id FROM `map_node`");
+	while($indicate_row=$indicate->fetch() ){
+		$ind_row[$indicate_row[indicate_id]]=$indicate_row[indicate_name];
+	}
+
+	if($classInfo>0) {
+  	while($data=$re->fetch()) {
+  		$grade = $data[grade];
+  		$classes = $data['class'];
+  		$user = $data[user_id];
+      $vData = explode('-', $user);
+      $sOrganizationID = $vData[0];
+
+  		$sql_nodeStatus = '	SELECT *
+				FROM map_node_student_status , map_info
+				WHERE map_node_student_status.user_id = "'.$user.'"  AND map_node_student_status.map_sn=map_info.map_sn';
+
+    	$re_nodeStatus=$dbh->query($sql_nodeStatus);
+    	$allnode_pass=0;
+    	$Allnode_num=0;
+    	$allnode_nopass=0;
+    	$pass_node='';
+
+    	while($data_nodeStatus = $re_nodeStatus->fetch()) {
+    		$subject=$data_nodeStatus[subject_id];
+        // 小節點精熟及完成度
+    		$sNodeS = unserialize( $data_nodeStatus[sNodes_Status_FR] );
+    		if(!is_array($sNodeS) ){
+    			debugBAI(__LINE__,__FILE__, 'sNodes is null. '.$user);
+    			continue;
+    		}
+    		foreach ($sNodeS as $key =>$value) {
+          switch($value['status:']) {
+            case 0:
+              $allnode_nopass++;
+              $Allnode_num++;
+              break;
+            case 1:
+              $allnode_pass++;
+              $Allnode_num++;
+              break;
+          }
+          $vReportData[$sOrganizationID]['node'] = $subject.'-'.$allnode_pass.'-'.$allnode_nopass;
+    		}
+    	}
+	  }
+	}
 }
 ?>
 <!DOCTYPE HTML>
@@ -496,8 +559,6 @@ function arraytoJS($vData) {
 	});
 </script>
 <style>
-  table tbody, table thead {display: inline-block;table-layout:fixed;}
-  table tbody {overflow:auto;height:750px;weight:50%;}
   #main_cond label {cursor:pointer;}
   #tab_indicator thead {cursor:pointer;}
   #tab_indicator > * > * > * {vertical-align:middle;}
@@ -517,7 +578,7 @@ function arraytoJS($vData) {
         <div class="choice-title">報表</div>
           <ul class="choice work-cholic">
         	  <li><a href="modules.php?op=modload&name=schoolReport&file=report_dailyusage" class="current"><i class="fa fa-caret-right"></i>各校使用狀況</a></li>
-        		<li><a href="modules.php?op=modload&name=schoolReport&file=report_userinfo2"><i class="fa fa-caret-right"></i>各校學習狀況</a></li>
+        		<li><a href="modules.php?op=modload&name=schoolReport&file=report_learningeffect"><i class="fa fa-caret-right"></i>各校學習狀況</a></li>
           </ul>
    		 </div>
       <div class="left-box">
