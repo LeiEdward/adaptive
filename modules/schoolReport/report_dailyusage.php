@@ -327,12 +327,6 @@ function arraytoJS($vData) {
   };
 
 	$(function() {
-    $("table").children("thead").find("td,th").each(function(){
-        var idx = $(this).index();
-        var td = $(this).closest("table").children("tbody")
-                        .children("tr:first").children("td,th").eq(idx);
-        $(this).width() > td.width() ? td.width($(this).width()) : $(this).width(td.width());
-    });
     $("#search_start").click(function() {
   	  $("#setrange").attr("checked",true);
   	});
