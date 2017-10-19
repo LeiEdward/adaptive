@@ -9,38 +9,132 @@
 
   // 取得 user 資料
   $vUserData = get_object_vars($_SESSION['user_data']);
-  $sUserLevel = $vUserData['access_level'];
-  $sManageCity = $vUserData['city_name'];
-  $sOrganization = $vUserData['organization_id'];
-  $sSemeYear = $vUserData['semeYear'];
-  $sCityCode = $vUserData['city_code'];
 
-  // 查詢條件設定
-  getUserACL($sUserLevel, $sManageCity);
+  // 取得報表資料
+  $vReportData = getReprotData($vUserData, $_POST);
 
-  // 依地區搜尋條件
-  $sCitySelect = getSelector($vCityData);
+  // 取得圖表資料
+  $vChart = getChartData($vReportData, $_POST);
+
+  // 權限控制開放搜尋內容
+  getUserACL($vUserData);
+
+  // 下拉選單條件設定
+  $vSelect = getSelector($vCityData, $vGrade, $vSubject);
+
+  // 時間範圍
+  $sUserSearch = getCondetionRange($_POST);
 
   // 整理資料, 統一變數傳至HTML
   $sJSOject = arraytoJS(array('City' => $vCityData,
                               'CityArea' => $vCiryArea,
                               'School' => $vSchool,
+                              'Grade' => $vGrade,
+                              'Subject' => $vSubject,
                               'UserCond' => $sUserSearch,
                               'CondCity' => $_POST['hiCity'],
                               'CondArea' => $_POST['hiArea'],
                               'CondSchool' => $_POST['hiSchool'],
-                              'Chart' => $vChart
-                      ));
+                              'Chart' => $vChart));
 
-function getUserACL($sUserLevel, $sManageCity) {
-  global $dbh, $vCityData, $vCiryArea, $vSchool;
+function getReprotData($vUserData, $vData) {
+  global $dbh;
+
+  $sUserLevel = $vUserData['access_level'];
+  $sManageCity = $vUserData['city_name'];
+  $sSemeYear = $vUserData['semeYear'];
+  $sCityCode = $vUserData['city_code'];
+
+  $sReprotSQL = "SELECT * FROM report_dailyusage ";
+  switch ($sUserLevel) {
+    case '41': // 縣市政府
+      $sReprotSQL .= "WHERE city_name IN('$sManageCity') ";
+      if(isset($vData['time'])) $sReprotSQL .= " AND ";
+      break;
+
+    case '51': // 教育部
+      if(isset($vData['time'])) $sReprotSQL .= " WHERE ";
+      break;
+  }
+  if(isset($vData['time'])) {
+    if ('search' === $vData['time']) {
+      $sReprotSQL .= ' (datetime_log >= "'.$vData['search_start'].'" AND datetime_log <= "'.$vData['search_end'].' 23:59:59") ';
+    }
+    else {
+      $sReprotSQL .= ' datetime_log > "'.$vData['time'].' "';
+    }
+  }
+  if (isset($vData['hiCity']) && !empty($vData['hiCity'])) {
+    $sReprotSQL .= ' AND city_name IN("'.$vData['hiCity'].'") ';
+  }
+  if (isset($vData['hiArea']) && !empty($vData['hiArea'])) {
+    $sReprotSQL .= ' AND city_area IN("'.$vData['hiArea'].'") ';
+  }
+  if (isset($vData['hiSchool']) && !empty($vData['hiSchool'])) {
+    $sReprotSQL .= ' AND name IN("'.$vData['hiSchool'].'") ';
+  }
+  $sReprotSQL .= " GROUP BY organization_id ORDER BY organization_id";
+
+  $oReprot = $dbh->prepare($sReprotSQL);
+  $oReprot->execute();
+  $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
+
+  return $vReportData;
+}
+
+function getChartData($vReportData, $vCond) {
+  foreach($vReportData as $vReport) {
+    if ('' != $vReport['node']) {
+      $vNode = unserialize($vReport['node']);
+      $sName = preg_replace('/\t|\s+/', '', $vReport['name']);
+      $vChart['school'][] = $sName;
+      $tmpDatat = array();
+      foreach ($vNode as $vData) {
+        foreach ($vData as $sGrade => $vNodeData) {
+          if (!empty($vCond['hiSubject']) && $vCond['hiSubject'] == $vNodeData['name']) {
+            $tmpDatat[$vReport['organization_id']]['nopassnode'] += $vNodeData['nopassnode'];
+            $tmpDatat[$vReport['organization_id']]['passnode'] += $vNodeData['passnode'];
+            $tmpDatat[$vReport['organization_id']]['allnode'] += $vNodeData['allnode'];
+          }
+
+          if (!empty($vCond['hiGrade']) && $vCond['hiGrade'] == $sGrade) {
+            $tmpDatat[$vReport['organization_id']]['nopassnode'] += $vNodeData['nopassnode'];
+            $tmpDatat[$vReport['organization_id']]['passnode'] += $vNodeData['passnode'];
+            $tmpDatat[$vReport['organization_id']]['allnode'] += $vNodeData['allnode'];
+          }
+
+          if(empty($vCond['hiSubject']) && empty($vCond['hiGrade'])) {
+            $tmpDatat[$vReport['organization_id']]['nopassnode'] += $vNodeData['nopassnode'];
+            $tmpDatat[$vReport['organization_id']]['passnode'] += $vNodeData['passnode'];
+            $tmpDatat[$vReport['organization_id']]['allnode'] += $vNodeData['allnode'];
+          }
+        }
+      }
+      $vChart['nopassnode'][] = $tmpDatat[$vReport['organization_id']]['nopassnode'];
+      $vChart['passnode'][] = $tmpDatat[$vReport['organization_id']]['passnode'];
+      $vChart['allnode'][] = $tmpDatat[$vReport['organization_id']]['allnode'];
+    }
+  }
+  return $vChart;
+}
+
+function getUserACL($vUserData) {
+  global $dbh, $vCityData, $vCiryArea, $vSchool, $vGrade, $vSubject;
 
   $vSchool = array();
   $vCityData = array();
   $vCiryArea = array();
-  $sSQLCond = "SELECT city_name, city_area, postcode, name FROM report_dailyusage ";
-  if ('41' == $sUserLevel) {
-    $sSQLCond .=  "WHERE city_name IN('$sManageCity') ";
+  $sUserLevel = $vUserData['access_level'];
+  $sManageCity = $vUserData['city_name'];
+  $sSQLCond = "SELECT city_name, city_area, postcode, name, node, organization_id FROM report_dailyusage ";
+  switch($sUserLevel) {
+    case '41':
+      $sSQLCond .=  "WHERE city_name IN('$sManageCity') AND LENGTH(node) > 1";
+      break;
+
+    default:
+      $sSQLCond .=  "WHERE LENGTH(node) > 1";
+      break;
   }
   $oCond = $dbh->prepare($sSQLCond);
   $oCond->execute();
@@ -49,27 +143,80 @@ function getUserACL($sUserLevel, $sManageCity) {
     $vSchool[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['name']);
     $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
     $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
-  }
-}
 
-function getSelector($vCityData) {
-  $vCitySelect = array();
-  $vCitySelect[] = '<select id="select_city">';
-  $vCitySelect[] =   '<option value="">縣市</option>';
-  if (!empty($vCityData)) {
-    foreach ($vCityData as $tmpData) {
-      $vCitySelect[] = '<option value="'.$tmpData.'">'.$tmpData.'</option>';
+    $vNode = unserialize($tmpData['node']);
+    foreach ($vNode as $vData) {
+      foreach ($vData as $sGrade => $vNodeData) {
+        $vGrade[$sGrade] = $sGrade;
+        $vSubject[$vNodeData['name']] = $vNodeData['name'];
+      }
     }
   }
-  $vCitySelect[] = '</select>';
-  $vCitySelect[] = '<select id="select_area">';
-  $vCitySelect[] =   '<option value="區">區</option>';
-  $vCitySelect[] = '</select>';
-  $vCitySelect[] = '<select id="select_school">';
-  $vCitySelect[] =   '<option value="學校">學校</option>';
-  $vCitySelect[] = '</select>';
+  ksort($vGrade);
+  ksort($vSubject);
+}
 
-  return implode('', $vCitySelect);
+function getSelector($vCityData, $vGrade, $vSubject) {
+  $vSelect = array();
+  $vSelect['CitySelect'][] = '<select id="select_city">';
+  $vSelect['CitySelect'][] =   '<option value="">縣市</option>';
+  if (!empty($vCityData)) {
+    foreach ($vCityData as $tmpData) {
+      $vSelect['CitySelect'][] = '<option value="'.$tmpData.'">'.$tmpData.'</option>';
+    }
+  }
+  $vSelect['CitySelect'][] = '</select>';
+  $vSelect['CitySelect'][] = '<select id="select_area">';
+  $vSelect['CitySelect'][] =   '<option value="區">區</option>';
+  $vSelect['CitySelect'][] = '</select>';
+  $vSelect['CitySelect'][] = '<select id="select_school">';
+  $vSelect['CitySelect'][] =   '<option value="學校">學校</option>';
+  $vSelect['CitySelect'][] = '</select>';
+
+  $vSelect['Subject'][] = '<select id="select_subject">';
+  $vSelect['Subject'][] =   '<option value="">科目</option>';
+  if (!empty($vSubject)) {
+    foreach ($vSubject as $tmpData) {
+      $vSelect['Subject'][] = '<option value="'.$tmpData.'">'.$tmpData.'</option>';
+    }
+  }
+  $vSelect['Subject'][] = '</select>';
+  $vSelect['Subject'][] = '<select id="select_grade">';
+  $vSelect['Subject'][] =   '<option value="年級">年級</option>';
+  if (!empty($vGrade)) {
+    foreach ($vGrade as $tmpData) {
+      $vSelect['Subject'][] = '<option value="'.$tmpData.'">'.$tmpData.'年級</option>';
+    }
+  }
+  $vSelect['Subject'][] = '</select>';
+
+  return $vSelect;
+}
+
+function getCondetionRange($vData) {
+  if (!empty($vData['hiCity'])) $sUserSearch = $vData['hiCity'].' / ';
+  if (!empty($vData['hiArea'])) $sUserSearch .= $vData['hiArea'].' / ';
+  if (!empty($vData['hiSchool'])) $sUserSearch .= $vData['hiSchool'].' / ';
+  if (!empty($vData['hiSubject'])) $sUserSearch .= $vData['hiSubject'].' / ';
+  if (!empty($vData['hiGrade'])) $sUserSearch .= $vData['hiGrade'].'年級 / ';
+
+  if($vData['time'] == '0000-00-00' || !isset($vData['time'])) {
+    $sUserSearch .= " 全部時間";
+  }
+  elseif($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-7, date("Y")))){
+    $sUserSearch .= "最近一週";
+  }
+  elseif($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-14, date("Y")))){
+    $sUserSearch .= "最近兩週";
+  }
+  elseif ($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m")-1 ,date("d"), date("Y")))){
+    $sUserSearch .= "最近一個月";
+  }
+  else {
+    $sUserSearch .= "指定區間".$vData['search_start']."~".$vData['search_end'];
+  }
+
+  return $sUserSearch;
 }
 
 function arraytoJS($vData) {
@@ -97,10 +244,71 @@ function arraytoJS($vData) {
     cond: oItem.UserCond,
     city: oItem.CondCity,
     area: oItem.CondArea,
-    school: (!!oItem.CondSchool && '' !== oItem.CondSchool) ? oItem.CondSchool : '全部學校'
+    school: (!!oItem.CondSchool) ? oItem.CondSchool : '全部學校'
   };
 
 	$(function() {
+    if (null !== oItem.Chart) {
+      var dom = document.getElementById("main_chart");
+      var myChart = echarts.init(dom);
+      var option = {
+        textStyle: {fontWeight: 'bold', fontSize: '14'},
+        title: {text: oUserSelect.CondSchool, subtext: oUserSelect.cond},
+        tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
+        legend: {data: ['通過節總點人數', '未通過總人數', '全部人數']},
+        grid: {left: '3%',right: '4%', bottom: '3%', containLabel: true},
+        xAxis: {type:'value', boundaryGap:[0, 1]},
+        yAxis: {type: 'category',data: oItem.Chart.school},
+        series: [{name:'通過節總點人數', type:'bar', data:oItem.Chart.passnode},
+                 {name:'未通過總人數', type:'bar',data:oItem.Chart.nopassnode},
+                 {name:'全部人數', type:'bar',data:oItem.Chart.allnode}]
+      };
+      myChart.setOption(option, true);
+
+      // 圓餅圖 搜尋條件要選學校才出現
+      if (('' !== oItem.CondSchool && 'string' === typeof oItem.CondSchool) || 1 === oItem.Chart.school.length) {
+        var oDivPeople = document.getElementById("school_people");
+        oDivPeople.style.height = '700px';
+        var chart_people = echarts.init(oDivPeople);
+        var oPeople = {
+          // tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
+          // legend: {orient: 'vertical',x: 'left', data:['測驗人數','影片瀏覽人數','練習題測驗人數','影片瀏覽時間(小時)']},
+          legend: {orient: 'vertical',x: 'left', data:['通過節總點人數','未通過總人數']},
+          series : [{ name: oItem.CondSchool,
+                      type:'pie',
+                      radius: ['50%', '70%'],
+                      avoidLabelOverlap: false,
+                      label: {
+                          normal: {
+                              show: false,
+                              position: 'center'
+                          },
+                          emphasis: {
+                              show: true,
+                              textStyle: {
+                                  fontSize: '30',
+                                  fontWeight: 'bold'
+                              }
+                          }
+                      },
+                      labelLine: {
+                          normal: {
+                              show: false
+                          }
+                      },
+                      data:[
+                        {value:oItem.Chart.passnode, name:'通過節總點人數' + oItem.Chart.passnode + '人'},
+                        {value:oItem.Chart.nopassnode, name:'未通過總人數' + oItem.Chart.nopassnode + '人'}
+                      ]
+                  }
+              ]
+        };
+        chart_people.setOption(oPeople, true);
+      }
+    }
+    else {
+      $("#main_chart").text('查無資料!');
+    }
 
     $("#search_start").click(function() {
   	  $("#setrange").attr("checked",true);
@@ -108,6 +316,7 @@ function arraytoJS($vData) {
     $("#search_end").click(function() {
   	  $("#setrange").attr("checked",true);
   	});
+
 
     // 選擇縣市, 區及學校需變動
     $('#select_city').change(function() {
@@ -156,6 +365,18 @@ function arraytoJS($vData) {
       $('#hiSchool').val($('#select_school').val());
     });
 
+    // 科目
+    $('#select_subject').change(function() {
+      if ('' === $('#select_subject').val()) return
+      $('#hiSubject').val($('#select_subject').val());
+    });
+
+    // 年級
+    $('#select_grade').change(function() {
+      if ('' === $('#select_grade').val()) return
+      $('#hiGrade').val($('#select_grade').val());
+    });
+
     // if ('' !== oUserSelect.city) {
     //   $('#select_city').val(oUserSelect.city);
     //   $('#hiCity').val(oUserSelect.city);
@@ -196,10 +417,12 @@ function arraytoJS($vData) {
    		 </div>
       <div class="left-box">
         依定區搜尋
-<?php echo $sCitySelect; ?>
+<?php echo implode('', $vSelect['CitySelect']); ?>
+        科目 年級
+<?php echo implode('', $vSelect['Subject']); ?>
       </div>
  			<div class="right-box">
-			  <form id="main_cond" method="post" action="modules.php?op=modload&name=schoolReport&file=report_dailyusage">
+			  <form id="main_cond" method="post" action="modules.php?op=modload&name=schoolReport&file=report_learningeffect">
 			    <label><input type="radio" name="time" value="0000-00-00" checked>全部時間</label>
 			    <label><input type="radio" name="time" value="<?php echo date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-7, date("Y")));?>">最近一週</label>
 			    <label><input type="radio" name="time" value="<?php echo date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-14, date("Y")));?>">最近兩週</label>
@@ -210,13 +433,14 @@ function arraytoJS($vData) {
           <input type="hidden" id="hiCity" name="hiCity">
           <input type="hidden" id="hiArea" name="hiArea">
           <input type="hidden" id="hiSchool" name="hiSchool">
+          <input type="hidden" id="hiSubject" name="hiSubject">
+          <input type="hidden" id="hiGrade" name="hiGrade">
 			    <input type="submit" name="sreach" class="btn02" style="width:70px; display: inline;" value="查詢">
 	      </form>
 		  <font class="color-blue">搜尋範圍：<?php echo $sUserSearch; ?></font>
   		<div style="text-align:right;display:inline;"><a href="<?php echo './data/tmp/use_dayilyusage.xlsx';?>" style="text-decoration:underline;">檔案下載</a></div>
   		<div id="main_chart" style="height:700px;"></div>
       <div id="school_people"></div>
-      <div id="school_time"></div>
     </div>
   </div>
 </html>
