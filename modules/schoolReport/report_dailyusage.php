@@ -2,12 +2,279 @@
   include_once('include/config.php');
   include_once('classes/PHPExcel.php');
   include_once('classes/PHPExcel/IOFactory.php');
-  include_once('include/ref_cityarea.php');
 
   if (!isset($_SESSION)) {
   	session_start();
   }
-  // 以下是把所有資料整理至 report_dailyusage Table中 --------------------------------------------------------------------
+  // 取得 user 資料
+  $vUserData = get_object_vars($_SESSION['user_data']);
+
+  createReport_dailyusage($vUserData);
+
+  $vReportData = getReprotData($vUserData, $_POST);
+
+  $vReportData = handleData($vReportData);
+
+  $vChart = array();
+  foreach($vReportData as $vReport) {
+    $sName = preg_replace('/\t|\s+/', '', $vReport['name']);
+    $vChart['school'][] = $sName;
+    $vChart['examtotal'][] = $vReport['exam_total'];
+    $vChart['watching'][] = $vReport['video_watching_total'];
+    $vChart['exercise'][] = $vReport['exercise_total'];
+    $vChart['spendtime'][] = $vReport['video_spend_time'];
+  }
+
+  // Excel
+  make_excel($vReportData);
+
+  // 查詢條件設定
+  getUserACL($vUserData);
+
+  // 依地區搜尋條件
+  $sCitySelect = getSelector($vCityData);
+
+  // 時間範圍
+  $sUserSearch = getCondetionRange($_POST);
+
+  // 整理資料, 統一變數傳至HTML
+  $sJSOject = arraytoJS(array('City' => $vCityData,
+                              'CityArea' => $vCiryArea,
+                              'School' => $vSchool,
+                              'UserCond' => $sUserSearch,
+                              'CondCity' => $_POST['hiCity'],
+                              'CondArea' => $_POST['hiArea'],
+                              'CondSchool' => $_POST['hiSchool'],
+                              'Chart' => $vChart
+                      ));
+
+function getUserACL($vUserData) {
+  global $dbh, $vCityData, $vCiryArea, $vSchool;
+
+  $vSchool = array();
+  $vCityData = array();
+  $vCiryArea = array();
+  $sUserLevel = $vUserData['access_level'];
+  $sManageCity = $vUserData['city_name'];
+  $sSQLCond = "SELECT city_name, city_area, postcode, name FROM report_dailyusage ";
+  if ('41' == $sUserLevel) {
+    $sSQLCond .=  "WHERE city_name IN('$sManageCity') ";
+  }
+  $oCond = $dbh->prepare($sSQLCond);
+  $oCond->execute();
+  $vCond = $oCond->fetchAll(\PDO::FETCH_ASSOC);
+  foreach ($vCond as $tmpData) {
+    $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
+    $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
+    $vSchool[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['name']);
+  }
+}
+
+function getCondetionRange($vData) {
+  if (!empty($vData['hiCity'])) $sUserSearch = $vData['hiCity'].' / ';
+  if (!empty($vData['hiArea'])) $sUserSearch .= $vData['hiArea'].' / ';
+  if (!empty($vData['hiSchool'])) $sUserSearch .= $vData['hiSchool'].' / ';
+
+  if($vData['time'] == '0000-00-00' || !isset($vData['time'])) {
+    $sUserSearch .= " 全部時間";
+  }
+  elseif($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-7, date("Y")))){
+    $sUserSearch .= "最近一週";
+  }
+  elseif($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-14, date("Y")))){
+    $sUserSearch .= "最近兩週";
+  }
+  elseif ($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m")-1 ,date("d"), date("Y")))){
+    $sUserSearch .= "最近一個月";
+  }
+  else {
+    $sUserSearch .= "指定區間".$vData['search_start']."~".$vData['search_end'];
+  }
+
+  return $sUserSearch;
+}
+
+function make_excel($vReportData) {
+	$date = date("Ymd_His");
+	$excel_content[0] = array("學校代碼", "縣市", "區", "學校", "測驗人數", "影片瀏覽人數", "影片瀏覽時間(小時)", "練習題測驗人數");
+
+	foreach ($vReportData as $vData) {
+    if('' == $vData['exam_total']) $vData['exam_total'] = '0';
+    if('' == $vData['video_watching_total']) $vData['video_watching_total']='0';
+		if('' == $vData['video_spend_time']) $vData['video_spend_time']='0';
+		if('' == $vData['exercise_total']) $vData['exercise_total']='0';
+
+		$excel_content[$vData['organization_id']] = array($vData['organization_id'],
+                                                      $vData['city_name'],
+                                                      $vData['city_area'],
+                                                      $vData['name'],
+                                                      $vData['exam_total'],
+                                                      $vData['video_watching_total'],
+                                                      $vData['video_spend_time'],
+                                                      $vData['exercise_total']);
+	}
+	$objPHPExcel = new PHPExcel();
+	$objPHPExcel->setActiveSheetIndex(0);
+	$objPHPExcel->getActiveSheet()->fromArray($excel_content, null, 'A1');
+	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
+	$filename= 'use_dayilyusage.xlsx';
+	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
+	$objWriter->save(_ADP_PATH.'data/tmp/'.$filename);
+}
+
+function getSelector($vCityData) {
+  $vCitySelect = array();
+  $vCitySelect[] = '<select id="select_city">';
+  $vCitySelect[] =   '<option value="">縣市</option>';
+  if (!empty($vCityData)) {
+    foreach ($vCityData as $tmpData) {
+      $vCitySelect[] = '<option value="'.$tmpData.'">'.$tmpData.'</option>';
+    }
+  }
+  $vCitySelect[] = '</select>';
+  $vCitySelect[] = '<select id="select_area">';
+  $vCitySelect[] =   '<option value="區">區</option>';
+  $vCitySelect[] = '</select>';
+  $vCitySelect[] = '<select id="select_school">';
+  $vCitySelect[] =   '<option value="學校">學校</option>';
+  $vCitySelect[] = '</select>';
+
+  return implode('', $vCitySelect);
+}
+
+function arraytoJS($vData) {
+  $sJSOject = array();
+  if(!empty($vData) && is_array($vData)) {
+     $sJSOject = json_encode($vData);
+  }
+  return $sJSOject;
+}
+
+function getReprotData($vUserData, $vData) {
+  global $dbh;
+
+  $sUserLevel = $vUserData['access_level'];
+  $sManageCity = $vUserData['city_name'];
+  $sSemeYear = $vUserData['semeYear'];
+  $sCityCode = $vUserData['city_code'];
+
+  $sReprotSQL = "SELECT * FROM report_dailyusage ";
+  switch ($sUserLevel) {
+    case '41': // 縣市政府
+      $sReprotSQL .= "WHERE city_name IN('$sManageCity') ";
+      if(isset($vData['time'])) $sReprotSQL .= " AND ";
+      break;
+
+    case '51': // 教育部
+      if(isset($vData['time'])) $sReprotSQL .= " WHERE ";
+      break;
+  }
+  if(isset($vData['time'])) {
+    if ('search' === $vData['time']) {
+      $sReprotSQL .= ' (datetime_log >= "'.$vData['search_start'].'" AND datetime_log <= "'.$vData['search_end'].' 23:59:59") ';
+    }
+    else {
+      $sReprotSQL .= ' datetime_log > "'.$vData['time'].' "';
+    }
+  }
+  if (isset($vData['hiCity']) && !empty($vData['hiCity'])) {
+    $sReprotSQL .= ' AND city_name IN("'.$vData['hiCity'].'") ';
+  }
+  if (isset($vData['hiArea']) && !empty($vData['hiArea'])) {
+    $sReprotSQL .= ' AND city_area IN("'.$vData['hiArea'].'") ';
+  }
+  if (isset($vData['hiSchool']) && !empty($vData['hiSchool'])) {
+    $sReprotSQL .= ' AND name IN("'.$vData['hiSchool'].'") ';
+  }
+  $sReprotSQL .= " GROUP BY organization_id ORDER BY organization_id";
+
+  $oReprot = $dbh->prepare($sReprotSQL);
+  $oReprot->execute();
+  $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
+
+  return $vReportData;
+}
+
+function handleData($vReportData) {
+  if (empty($vReportData)) return array();
+  $vNewData = array();
+  foreach ($vReportData as $sKey => $vReport) {
+    if ('190039' != $vReport['organization_id'] && '190041' != $vReport['organization_id']) {
+      $vNewData[$sKey] = $vReport;
+    }
+  }
+  return $vNewData;
+}
+
+function getLearningStat($vReportData, $sSemeYear) {
+	global $dbh;
+
+  // 查出該校的所有學生
+  $sql = 'SELECT *
+		FROM seme_student a, user_status b
+		WHERE a.seme_year_seme = "'.$sSemeYear.'" AND a.stud_id=b.user_id
+		ORDER BY seme_year_seme, grade, class';
+
+	$re = $dbh->query($sql);
+	$classInfo = $re->rowCount();
+
+	$ind_row=array();
+	$indicate=$dbh->query("SELECT indicate_name, indicate_id FROM `map_node`");
+	while($indicate_row=$indicate->fetch() ){
+		$ind_row[$indicate_row[indicate_id]]=$indicate_row[indicate_name];
+	}
+
+	if($classInfo>0) {
+  	while($data=$re->fetch()) {
+  		$grade = $data[grade];
+  		$classes = $data['class'];
+  		$user = $data[user_id];
+      $sOrganizationID = $data['organization_id'];
+
+  		$sql_nodeStatus = '	SELECT *
+				FROM map_node_student_status , map_info
+				WHERE map_node_student_status.user_id = "'.$user.'"  AND map_node_student_status.map_sn=map_info.map_sn';
+
+    	$re_nodeStatus=$dbh->query($sql_nodeStatus);
+    	while($data_nodeStatus = $re_nodeStatus->fetch()) {
+    		$subject = $data_nodeStatus[subject_id];
+        $subtName = sub_name($subject);
+        // 小節點精熟及完成度
+    		$sNodeS = unserialize( $data_nodeStatus[sNodes_Status_FR] );
+    		if(!is_array($sNodeS)) {
+    			// debugBAI(__LINE__,__FILE__, 'sNodes is null. '.$user);
+    			continue;
+    		}
+    		foreach ($sNodeS as $value) {
+          if (!empty($value['status:'])) {
+            switch($value['status:']) {
+              case 0:
+                $vNodeData[$sOrganizationID][$subject][$grade]['name'] = $subtName;
+                $vNodeData[$sOrganizationID][$subject][$grade]['nopassnode']++;
+                $vNodeData[$sOrganizationID][$subject][$grade]['allnode']++;
+                break;
+              case 1:
+                $vNodeData[$sOrganizationID][$subject][$grade]['name'] = $subtName;
+                $vNodeData[$sOrganizationID][$subject][$grade]['passnode']++;
+                $vNodeData[$sOrganizationID][$subject][$grade]['allnode']++;
+                break;
+            }
+          }
+    		}
+    	}
+	  }
+    foreach ($vNodeData as $sOrganization => $vNodeTmp) {
+      $sNodeData = serialize($vNodeData[$sOrganization]);
+      $vReportData[$sOrganization]['node'] = $sNodeData;
+    }
+	}
+  return $vReportData;
+}
+
+function createReport_dailyusage($vUserData) {
+  global $dbh;
+
+  include_once('include/ref_cityarea.php');
   // 影片瀏覽人數
   $sSQLVideo = 'SELECT organization.organization_id, city.city_name, organization.name, SUBSTR(organization.address,2,3) postcode, COUNT(video_review_record.user_id) num
     FROM user_info,	(SELECT * FROM video_review_record GROUP BY user_id) video_review_record, organization, city ,user_status
@@ -108,202 +375,42 @@
   	$vReportData[$tmpExam['organization_id']]['exam_total'] = $tmpExam['num'];
   }
 
-  // 新增資料至 report_dailyusage Table
+  $vReportData = getLearningStat($vReportData, $vUserData['semeYear']);
 
-  // $sSQLUsage = $dbh->prepare("INSERT INTO
-  //   report_dailyusage (sn, organization_id, city_name, postcode, city_area, name, exam_total, video_watching_total, video_spend_time, exercise_total, datetime_log)
-  //   VALUES (NULL, :organization_id, :city_name, :postcode,:city_area, :name, :exam_total, :video_watching_total, :video_spend_time, :exercise_total, :datetime_log)");
-  //
-  // foreach ($vReportData as $key=>$value) {
-  //   if($value['exam_total']=='') $value['exam_total']=0;
-  //   if($value['video_p']=='') $value['video_p']=0;
-  //   if($value['video_t']=='') $value['video_t']=0;
-  //   if($value['prac']=='') $value['prac']=0;
-  //
-  // 	$sSQLUsage->bindValue(':organization_id', $key, PDO::PARAM_STR);
-  // 	$sSQLUsage->bindValue(':city_name', $value['city_name'], PDO::PARAM_STR);
-  //  $sSQLUsage->bindValue(':postcode', $value['postcode'], PDO::PARAM_STR);
-  // 	$sSQLUsage->bindValue(':city_area', $ref_cityarea[$value['postcode']][1], PDO::PARAM_STR);
-  // 	$sSQLUsage->bindValue(':name', $value['schoolname'], PDO::PARAM_STR);
-  // 	$sSQLUsage->bindValue(':exam_total', $value['exam_total'], PDO::PARAM_STR);
-  // 	$sSQLUsage->bindValue(':video_watching_total', $value['video_p'], PDO::PARAM_STR);
-  // 	$sSQLUsage->bindValue(':video_spend_time', $value['video_t'], PDO::PARAM_STR);
-  // 	$sSQLUsage->bindValue(':exercise_total', $value['prac'], PDO::PARAM_STR);
-  //   $sSQLUsage->bindValue(':datetime_log', date("Y-m-d, H:i:s"), PDO::PARAM_STR);
-  // 	$sSQLUsage->execute();
-  // }
-  //-------------------------------------------------------------------------------------------------------------------
+  $sSQLUsage = $dbh->prepare("INSERT INTO
+    report_dailyusage (sn, organization_id, city_name, postcode, city_area, name, exam_total, video_watching_total, video_spend_time, exercise_total, node, datetime_log)
+    VALUES (NULL, :organization_id, :city_name, :postcode,:city_area, :name, :exam_total, :video_watching_total, :video_spend_time, :exercise_total, :node, :datetime_log)");
 
-  $vUserData = get_object_vars($_SESSION['user_data']);
-  $sUserLevel = $vUserData['access_level'];
-  $sManageCity = $vUserData['city_name'];
-  $sFindData = '*'; // 資料分類
+  foreach ($vReportData as $key=>$value) {
+    if (empty($value['city_name']) || empty($value['postcode']) || empty($value['schoolname'])) continue;
+    if ('' == $value['exam_total']) $value['exam_total'] = 0;
+    if ('' == $value['video_p']) $value['video_p'] = 0;
+    if ('' == $value['video_t']) $value['video_t'] = 0;
+    if ('' == $value['prac']) $value['prac'] = 0;
+    if (!isset($value['node']) || empty($value['node'])) $value['node'] = '';
 
-  $sReprotSQL = "SELECT $sFindData FROM report_dailyusage ";
-  switch ($sUserLevel) {
-    case '41': // 縣市政府
-      $sReprotSQL .= "WHERE city_name IN('$sManageCity') ";
-      if(isset($_POST['time'])) $sReprotSQL .= " AND ";
-      break;
-
-    case '51': // 教育部
-      if(isset($_POST['time'])) $sReprotSQL .= " WHERE ";
-      break;
-  }
-  if(isset($_POST['time'])) {
-    if ('sreach' === $_POST['time']) {
-      $sReprotSQL .= ' (datetime_log > "'.$_POST['search_start'].'" AND datetime_log < "'.$_POST['search_end'].'") ';
-    }
-    else {
-      $sReprotSQL .= ' datetime_log > "'.$_POST['time'].' "';
-    }
-  }
-  if (isset($_POST['hiCity']) && !empty($_POST['hiCity'])) {
-    $sReprotSQL .= ' AND city_name IN("'.$_POST['hiCity'].'") ';
-  }
-  if (isset($_POST['hiArea']) && !empty($_POST['hiArea'])) {
-    $sReprotSQL .= ' AND city_area IN("'.$_POST['hiArea'].'") ';
-  }
-  if (isset($_POST['hiSchool']) && !empty($_POST['hiSchool'])) {
-    $sReprotSQL .= ' AND name IN("'.$_POST['hiSchool'].'") ';
-  }
-  $sReprotSQL .= " GROUP BY organization_id ORDER BY organization_id";
-
-  $oReprot = $dbh->prepare($sReprotSQL);
-  $oReprot->execute();
-  $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
-
-  $vChart = array();
-  foreach($vReportData as $vReprot) {
-    $sName = preg_replace('/\t|\s+/', '', $vReprot['name']);
-    $vChart['school'][] = $sName;
-    $vChart['examtotal'][] = $vReprot['exam_total'];
-    $vChart['watching'][] = $vReprot['video_watching_total'];
-    $vChart['exercise'][] = $vReprot['exercise_total'];
-    $vChart['spendtime'][] = $vReprot['video_spend_time'];
-  }
-
-  // Excel
-  make_excel($vReportData);
-
-  // 查詢條件設定
-  getUserACL($sUserLevel);
-
-  // 依地區搜尋條件
-  $sCitySelect = getSelector($vCityData);
-
-  // 時間範圍
-  $sUserSearch = getCondetionRange($_POST);
-
-  // 整理資料, 統一變數傳至HTML
-  arraytoJS(array('City' => $vCityData,
-                  'CityArea' => $vCiryArea,
-                  'School' => $vSchool,
-                  'UserCond' => $sUserSearch,
-                  'CondCity' => $_POST['hiCity'],
-                  'CondArea' => $_POST['hiArea'],
-                  'CondSchool' => $_POST['hiSchool'],
-                  'Chart' => $vChart
-          ));
-
-function getUserACL($sUserLevel) {
-  global $dbh, $vCityData, $vCiryArea, $vSchool, $sManageCity;
-
-  $vSchool = array();
-  $vCityData = array();
-  $vCiryArea = array();
-  $sSQLCond = "SELECT city_name, city_area, postcode, name FROM report_dailyusage ";
-  if ('41' == $sUserLevel) {
-    $sSQLCond .=  "WHERE city_name IN('$sManageCity') ";
-  }
-  $oCond = $dbh->prepare($sSQLCond);
-  $oCond->execute();
-  $vCond = $oCond->fetchAll(\PDO::FETCH_ASSOC);
-  foreach ($vCond as $tmpData) {
-    $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
-    $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
-    $vSchool[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['name']);
+  	$sSQLUsage->bindValue(':organization_id', $key, PDO::PARAM_STR);
+  	$sSQLUsage->bindValue(':city_name', $value['city_name'], PDO::PARAM_STR);
+    $sSQLUsage->bindValue(':postcode', $value['postcode'], PDO::PARAM_STR);
+  	$sSQLUsage->bindValue(':city_area', $ref_cityarea[$value['postcode']][1], PDO::PARAM_STR);
+  	$sSQLUsage->bindValue(':name', $value['schoolname'], PDO::PARAM_STR);
+  	$sSQLUsage->bindValue(':exam_total', $value['exam_total'], PDO::PARAM_STR);
+  	$sSQLUsage->bindValue(':video_watching_total', $value['video_p'], PDO::PARAM_STR);
+  	$sSQLUsage->bindValue(':video_spend_time', $value['video_t'], PDO::PARAM_STR);
+  	$sSQLUsage->bindValue(':exercise_total', $value['prac'], PDO::PARAM_STR);
+    $sSQLUsage->bindValue(':node', $value['node'], PDO::PARAM_STR);
+    $sSQLUsage->bindValue(':datetime_log', date("Y-m-d H:i:s"), PDO::PARAM_STR);
+  	$sSQLUsage->execute();
   }
 }
 
-function getCondetionRange($vData) {
-  if (!empty($vData['hiCity'])) $sUserSearch = $vData['hiCity'].' / ';
-  if (!empty($vData['hiArea'])) $sUserSearch .= $vData['hiArea'].' / ';
-  if (!empty($vData['hiSchool'])) $sUserSearch .= $vData['hiSchool'].' / ';
+function sub_name($sub) {
+	global $dbh;
 
-  if($vData['time'] == '0000-00-00' || !isset($vData['time'])) {
-    $sUserSearch .= " 全部時間";
-  }
-  elseif($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-7, date("Y")))){
-    $sUserSearch .= "最近一週";
-  }
-  elseif($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m") ,date("d")-14, date("Y")))){
-    $sUserSearch .= "最近兩週";
-  }
-  elseif ($vData['time'] == date( "Y-m-d", mktime (0,0,0,date("m")-1 ,date("d"), date("Y")))){
-    $sUserSearch .= "最近一個月";
-  }
-  else {
-    $sUserSearch .= "指定區間".$vData['search_start']."~".$vData['search_end'];
-  }
-
-  return $sUserSearch;
-}
-
-function make_excel($vReportData) {
-	$date = date("Ymd_His");
-	$excel_content[0] = array("學校代碼", "縣市", "區", "學校", "測驗人數", "影片瀏覽人數", "影片瀏覽時間(小時)", "練習題測驗人數");
-
-	foreach ($vReportData as $vData) {
-    if('' == $vData['exam_total']) $vData['exam_total'] = '0';
-    if('' == $vData['video_watching_total']) $vData['video_watching_total']='0';
-		if('' == $vData['video_spend_time']) $vData['video_spend_time']='0';
-		if('' == $vData['exercise_total']) $vData['exercise_total']='0';
-
-		$excel_content[$vData['organization_id']] = array($vData['organization_id'],
-                                                      $vData['city_name'],
-                                                      $vData['city_area'],
-                                                      $vData['name'],
-                                                      $vData['exam_total'],
-                                                      $vData['video_watching_total'],
-                                                      $vData['video_spend_time'],
-                                                      $vData['exercise_total']);
-	}
-	$objPHPExcel = new PHPExcel();
-	$objPHPExcel->setActiveSheetIndex(0);
-	$objPHPExcel->getActiveSheet()->fromArray($excel_content, null, 'A1');
-	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
-	$filename= 'use_dayilyusage.xlsx';
-	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
-	$objWriter->save(_ADP_PATH.'data/tmp/'.$filename);
-}
-
-function getSelector($vCityData) {
-  $vCitySelect = array();
-  $vCitySelect[] = '<select id="select_city">';
-  $vCitySelect[] =   '<option value="">縣市</option>';
-  if (!empty($vCityData)) {
-    foreach ($vCityData as $tmpData) {
-      $vCitySelect[] = '<option value="'.$tmpData.'">'.$tmpData.'</option>';
-    }
-  }
-  $vCitySelect[] = '</select>';
-  $vCitySelect[] = '<select id="select_area">';
-  $vCitySelect[] =   '<option value="區">區</option>';
-  $vCitySelect[] = '</select>';
-  $vCitySelect[] = '<select id="select_school">';
-  $vCitySelect[] =   '<option value="學校">學校</option>';
-  $vCitySelect[] = '</select>';
-
-  return implode('', $vCitySelect);
-}
-
-function arraytoJS($vData) {
-  global $sJSOject;
-
-  if(!empty($vData) && is_array($vData)) {
-    $sJSOject = json_encode($vData);
-  }
+	$sql = "SELECT map_name FROM `map_info` where subject_id='$sub' AND display=1";
+	$data = $dbh->query($sql);
+	$row = $data->fetch();
+	return $row['map_name'];
 }
 ?>
 <!DOCTYPE HTML>
@@ -327,183 +434,175 @@ function arraytoJS($vData) {
   };
 
 	$(function() {
-    $("table").children("thead").find("td,th").each(function(){
-        var idx = $(this).index();
-        var td = $(this).closest("table").children("tbody")
-                        .children("tr:first").children("td,th").eq(idx);
-        $(this).width() > td.width() ? td.width($(this).width()) : $(this).width(td.width());
-    });
     $("#search_start").click(function() {
   	  $("#setrange").attr("checked",true);
   	});
     $("#search_end").click(function() {
   	  $("#setrange").attr("checked",true);
   	});
+    if (null !== oItem.Chart) {
+      // chart
+      var dom = document.getElementById("main_chart");
+      var myChart = echarts.init(dom);
+      var option = {
+        textStyle: {fontWeight: 'bold', fontSize: '14'},
+        title: {text: oUserSelect.CondSchool, subtext: oUserSelect.cond},
+        tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
+        legend: {data: ['測驗人數', '影片瀏覽人數', '練習題測驗人數', '影片瀏覽時間(小時)']},
+        grid: {left: '3%',right: '4%', bottom: '3%', containLabel: true},
+        xAxis: {type:'value', boundaryGap:[0, 1]},
+        yAxis: {type: 'category',data: oItem.Chart.school},
+        series: [{name:'測驗人數', type:'bar', data:oItem.Chart.examtotal},
+                 {name:'影片瀏覽人數', type:'bar',data:oItem.Chart.watching},
+                 {name:'練習題測驗人數', type:'bar',data:oItem.Chart.exercise},
+                 {name:'影片瀏覽時間(小時)', type:'bar',data:oItem.Chart.spendtime}]
+      };
+      if (option && typeof option === "object") {
+          myChart.setOption(option, true);
+      }
 
-    // chart
-    var dom = document.getElementById("main_chart");
-    var myChart = echarts.init(dom);
-    var option = {
-      textStyle: {fontWeight: 'bold', fontSize: '14'},
-      title: {text: oItem.CondSchool, subtext: oUserSelect.cond},
-      tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
-      legend: {data: ['測驗人數', '影片瀏覽人數', '練習題測驗人數', '影片瀏覽時間(小時)']},
-      grid: {left: '3%',right: '4%', bottom: '3%', containLabel: true},
-      xAxis: {type:'value', boundaryGap:[0, 1]},
-      yAxis: {type: 'category',data: oItem.Chart.school},
-      series: [{name:'測驗人數', type:'bar', data:oItem.Chart.examtotal},
-               {name:'影片瀏覽人數', type:'bar',data:oItem.Chart.watching},
-               {name:'練習題測驗人數', type:'bar',data:oItem.Chart.exercise},
-               {name:'影片瀏覽時間(小時)', type:'bar',data:oItem.Chart.spendtime}]
-    };
-    if (option && typeof option === "object") {
-        myChart.setOption(option, true);
+      // 圓餅圖
+      if (('' !== oItem.CondSchool && 'string' === typeof oItem.CondSchool) || 1 === oItem.Chart.school.length) {
+        var oDivPeople = document.getElementById("school_people");
+        var oDivTime = document.getElementById("school_time");
+        oDivPeople.style.height = '700px';
+        oDivTime.style.height = '700px';
+        var chart_people = echarts.init(oDivPeople);
+        var chart_time = echarts.init(oDivTime);
+        var oPeople = {
+          // mouseover 效果
+          // tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
+          tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: ({d}%)"},
+          legend: {orient: 'vertical',x: 'left', data:['測驗人數','影片瀏覽人數','練習題測驗人數']},
+          series : [{ name: oItem.CondSchool,
+                      type:'pie',
+                      radius: ['50%', '70%'],
+                      avoidLabelOverlap: false,
+                      label: {
+                          normal: {
+                              show: false,
+                              position: 'center'
+                          },
+                          emphasis: {
+                              show: true,
+                              textStyle: {
+                                  fontSize: '30',
+                                  fontWeight: 'bold'
+                              }
+                          }
+                      },
+                      labelLine: {
+                          normal: {
+                              show: false
+                          }
+                      },
+                      data:[
+                        {value:oItem.Chart.examtotal, name:'測驗人數共' + oItem.Chart.examtotal + '人'},
+                        {value:oItem.Chart.watching, name:'影片瀏覽人數' + oItem.Chart.watching + '人'},
+                        {value:oItem.Chart.exercise, name:'練習題測驗人數'+ oItem.Chart.exercise + '人'}]
+                  }
+              ]
+        };
+        var oTime = {
+          // mouseover 效果
+          // tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
+          legend: {orient: 'vertical',x: 'left', data:['影片瀏覽時間(小時)']},
+          series : [{ name: oItem.CondSchool,
+                      type:'pie',
+                      radius: ['50%', '70%'],
+                      avoidLabelOverlap: false,
+                      label: {
+                          normal: {
+                              show: false,
+                              position: 'center'
+                          },
+                          emphasis: {
+                              show: true,
+                              textStyle: {
+                                  fontSize: '30',
+                                  fontWeight: 'bold'
+                              }
+                          }
+                      },
+                      labelLine: {
+                          normal: {
+                              show: false
+                          }
+                      },
+                      data:[{value:oItem.Chart.spendtime, name:'影片瀏覽共' + oItem.Chart.spendtime + '小時'}]
+                  }
+              ]
+        };
+        chart_people.setOption(oPeople, true);
+        chart_time.setOption(oTime, true);
     }
-
-    // 圓餅圖
-    if (('' !== oItem.CondSchool && 'string' === typeof oItem.CondSchool) || 1 === oItem.Chart.school.length) {
-      var oDivPeople = document.getElementById("school_people");
-      var oDivTime = document.getElementById("school_time");
-      oDivPeople.style.height = '700px';
-      oDivTime.style.height = '700px';
-      var chart_people = echarts.init(oDivPeople);
-      var chart_time = echarts.init(oDivTime);
-      var oPeople = {
-        tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
-        // legend: {orient: 'vertical',x: 'left', data:['測驗人數','影片瀏覽人數','練習題測驗人數','影片瀏覽時間(小時)']},
-        legend: {orient: 'vertical',x: 'left', data:['測驗人數','影片瀏覽人數','練習題測驗人數']},
-        series : [{ name: oItem.CondSchool,
-                    type:'pie',
-                    radius: ['50%', '70%'],
-                    avoidLabelOverlap: false,
-                    label: {
-                        normal: {
-                            show: false,
-                            position: 'center'
-                        },
-                        emphasis: {
-                            show: true,
-                            textStyle: {
-                                fontSize: '30',
-                                fontWeight: 'bold'
-                            }
-                        }
-                    },
-                    labelLine: {
-                        normal: {
-                            show: false
-                        }
-                    },
-                    data:[
-                      {value:oItem.Chart.examtotal, name:'測驗人數'},
-                      {value:oItem.Chart.watching, name:'影片瀏覽人數'},
-                      {value:oItem.Chart.exercise, name:'練習題測驗人數'}
-                      // {value:oItem.Chart.spendtime, name:'影片瀏覽時間(小時)'}
-                    ]
-                }
-            ]
-      };
-      var oTime = {
-        tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
-        // legend: {orient: 'vertical',x: 'left', data:['測驗人數','影片瀏覽人數','練習題測驗人數','影片瀏覽時間(小時)']},
-        legend: {orient: 'vertical',x: 'left', data:['影片瀏覽時間(小時)']},
-        series : [{ name: oItem.CondSchool,
-                    type:'pie',
-                    radius: ['50%', '70%'],
-                    avoidLabelOverlap: false,
-                    label: {
-                        normal: {
-                            show: false,
-                            position: 'center'
-                        },
-                        emphasis: {
-                            show: true,
-                            textStyle: {
-                                fontSize: '30',
-                                fontWeight: 'bold'
-                            }
-                        }
-                    },
-                    labelLine: {
-                        normal: {
-                            show: false
-                        }
-                    },
-                    data:[
-                      {value:oItem.Chart.spendtime, name:'影片瀏覽時間(小時)'}
-                    ]
-                }
-            ]
-      };
-      chart_people.setOption(oPeople, true);
-      chart_time.setOption(oTime, true);
   }
+  else {
+    $("#main_chart").text('查無資料!');
+  }
+  // 選擇縣市, 區及學校需變動
+  $('#select_city').change(function() {
+    if ('' === $('#select_city').val()) return
 
-    // 選擇縣市, 區及學校需變動
-    $('#select_city').change(function() {
-      if ('' === $('#select_city').val()) return
-
-      // 區
-      $("#select_area").empty();
-      $('#select_area').append($('<option>', {value:''}).text('區'));
-      $.each(oItem.CityArea[$('#select_city').val()], function(iInx, vData) {
-        $('#select_area').append($('<option>', {value:vData[1]}).text(vData[1]));
-      });
-
-      // 學校
-      $("#select_school").empty();
-      $('#select_school').append($('<option>', {value:''}).text('學校'));
-      $.each(oItem.School[$('#select_city').val()], function(iInx, vData) {
-        if ($('#select_area').val() === vData[0]) {
-          $('#select_school').append($('<option>', {value:vData[1]}).text(vData[1]));
-        }
-      });
-
-      $('#hiCity').val($('#select_city').val());
-      $('#hiArea').val($('#select_area').val());
-      $('#hiSchool').val($('#select_school').val());
-    });
-
-    // 選擇區 學校需變動
-    $('#select_area').change(function() {
-      if ('' === $('#select_area').val()) return
-
-      // 學校
-      $("#select_school").empty();
-      $('#select_school').append($('<option>', {value:''}).text('學校'));
-      $.each(oItem.School[$('#select_city').val()], function(iInx, vData) {
-        if ($('#select_area').val() === vData[1]) {
-          $('#select_school').append($('<option>', {value:vData[2]}).text(vData[2]));
-        }
-      });
-      $('#hiSchool').val($('#select_school').val());
-      $('#hiArea').val($('#select_area').val());
+    // 區
+    $("#select_area").empty();
+    $('#select_area').append($('<option>', {value:''}).text('區'));
+    $.each(oItem.CityArea[$('#select_city').val()], function(iInx, vData) {
+      $('#select_area').append($('<option>', {value:vData[1]}).text(vData[1]));
     });
 
     // 學校
-    $('#select_school').change(function() {
-      if ('' === $('#select_school').val()) return
-      $('#hiSchool').val($('#select_school').val());
+    $("#select_school").empty();
+    $('#select_school').append($('<option>', {value:''}).text('學校'));
+    $.each(oItem.School[$('#select_city').val()], function(iInx, vData) {
+      if ($('#select_area').val() === vData[0]) {
+        $('#select_school').append($('<option>', {value:vData[1]}).text(vData[1]));
+      }
     });
 
-    // if ('' !== oUserSelect.city) {
-    //   $('#select_city').val(oUserSelect.city);
-    //   $('#hiCity').val(oUserSelect.city);
-    // }
-    // if ('' !== oUserSelect.area) {
-    //   $('#select_area').val(oUserSelect.area);
-    //   $('#hiArea').val(oUserSelect.area);
-    // }
-    // if ('' !== oUserSelect.school) {
-    //   $('#select_school').val(oUserSelect.school);
-    //   $('#hiSchool').val(oUserSelect.school);
-    // }
+    $('#hiCity').val($('#select_city').val());
+    $('#hiArea').val($('#select_area').val());
+    $('#hiSchool').val($('#select_school').val());
+  });
 
-	});
+  // 選擇區 學校需變動
+  $('#select_area').change(function() {
+    if ('' === $('#select_area').val()) return
+
+    // 學校
+    $("#select_school").empty();
+    $('#select_school').append($('<option>', {value:''}).text('學校'));
+    $.each(oItem.School[$('#select_city').val()], function(iInx, vData) {
+      if ($('#select_area').val() === vData[1]) {
+        $('#select_school').append($('<option>', {value:vData[2]}).text(vData[2]));
+      }
+    });
+    $('#hiSchool').val($('#select_school').val());
+    $('#hiArea').val($('#select_area').val());
+  });
+
+  // 學校
+  $('#select_school').change(function() {
+    if ('' === $('#select_school').val()) return
+    $('#hiSchool').val($('#select_school').val());
+  });
+
+  // if ('' !== oUserSelect.city) {
+  //   $('#select_city').val(oUserSelect.city);
+  //   $('#hiCity').val(oUserSelect.city);
+  // }
+  // if ('' !== oUserSelect.area) {
+  //   $('#select_area').val(oUserSelect.area);
+  //   $('#hiArea').val(oUserSelect.area);
+  // }
+  // if ('' !== oUserSelect.school) {
+  //   $('#select_school').val(oUserSelect.school);
+  //   $('#hiSchool').val(oUserSelect.school);
+  // }
+
+});
 </script>
 <style>
-  table tbody, table thead {display: inline-block;table-layout:fixed;}
-  table tbody {overflow:auto;height:750px;weight:50%;}
   #main_cond label {cursor:pointer;}
   #tab_indicator thead {cursor:pointer;}
   #tab_indicator > * > * > * {vertical-align:middle;}
@@ -523,7 +622,7 @@ function arraytoJS($vData) {
         <div class="choice-title">報表</div>
           <ul class="choice work-cholic">
         	  <li><a href="modules.php?op=modload&name=schoolReport&file=report_dailyusage" class="current"><i class="fa fa-caret-right"></i>各校使用狀況</a></li>
-        		<li><a href="modules.php?op=modload&name=schoolReport&file=report_userinfo2"><i class="fa fa-caret-right"></i>各校學習狀況</a></li>
+        		<li><a href="modules.php?op=modload&name=schoolReport&file=report_learningeffect"><i class="fa fa-caret-right"></i>各校學習狀況</a></li>
           </ul>
    		 </div>
       <div class="left-box">
