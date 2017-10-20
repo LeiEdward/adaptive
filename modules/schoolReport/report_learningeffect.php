@@ -13,6 +13,9 @@
   // 取得報表資料
   $vReportData = getReprotData($vUserData, $_POST);
 
+  // 整理報表資料
+  $vReportData = handleData($vReportData);
+
   // 取得圖表資料
   $vChart = getChartData($vReportData, $_POST);
 
@@ -80,6 +83,17 @@ function getReprotData($vUserData, $vData) {
   $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
 
   return $vReportData;
+}
+
+function handleData($vReportData) {
+  if (empty($vReportData)) return array();
+  $vNewData = array();
+  foreach ($vReportData as $sKey => $vReport) {
+    if ('190039' != $vReport['organization_id'] && '190041' != $vReport['organization_id']) {
+      $vNewData[$sKey] = $vReport;
+    }
+  }
+  return $vNewData;
 }
 
 function getChartData($vReportData, $vCond) {
@@ -230,13 +244,17 @@ function arraytoJS($vData) {
 <!DOCTYPE HTML>
 <html>
 <header>
-<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/echarts-all-3.js"></script>
-<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts-stat/ecStat.min.js"></script>
-<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/dataTool.min.js"></script>
-<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/china.js"></script>
-<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/world.js"></script>
-<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=ZUONbpqGBsYGXNIYHicvbAbM"></script>
-<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/bmap.min.js"></script>
+  <!-- 統計圖套件 -->
+  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/echarts-all-3.js"></script>
+  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts-stat/ecStat.min.js"></script>
+  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/dataTool.min.js"></script>
+  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/china.js"></script>
+  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/world.js"></script>
+  <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=ZUONbpqGBsYGXNIYHicvbAbM"></script>
+  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/bmap.min.js"></script>
+  <!-- Loading套件 -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/extras/loadingoverlay_progress/loadingoverlay_progress.min.js"></script>
 </header>
 <script>
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
@@ -248,6 +266,12 @@ function arraytoJS($vData) {
   };
 
 	$(function() {
+    $.LoadingOverlay("show");
+
+    $(document).ready(function() {
+      $.LoadingOverlay("hide");
+    });
+
     if (null !== oItem.Chart) {
       var dom = document.getElementById("main_chart");
       var myChart = echarts.init(dom);
@@ -256,6 +280,11 @@ function arraytoJS($vData) {
         title: {text: oUserSelect.CondSchool, subtext: oUserSelect.cond},
         tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
         legend: {data: ['通過節總點人數', '未通過總人數', '全部人數']},
+        toolbox: {show : true,
+          feature : {
+            saveAsImage : {show: true, title: '圖片', name: '各校學習狀況-長條圖'}
+          }
+        },
         grid: {left: '3%',right: '4%', bottom: '3%', containLabel: true},
         xAxis: {type:'value', boundaryGap:[0, 1]},
         yAxis: {type: 'category',data: oItem.Chart.school},
@@ -272,7 +301,6 @@ function arraytoJS($vData) {
         var chart_people = echarts.init(oDivPeople);
         var oPeople = {
           // tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
-          // legend: {orient: 'vertical',x: 'left', data:['測驗人數','影片瀏覽人數','練習題測驗人數','影片瀏覽時間(小時)']},
           legend: {orient: 'vertical',x: 'left', data:['通過節總點人數','未通過總人數']},
           series : [{ name: oItem.CondSchool,
                       type:'pie',
@@ -438,7 +466,7 @@ function arraytoJS($vData) {
 			    <input type="submit" name="sreach" class="btn02" style="width:70px; display: inline;" value="查詢">
 	      </form>
 		  <font class="color-blue">搜尋範圍：<?php echo $sUserSearch; ?></font>
-  		<div style="text-align:right;display:inline;"><a href="<?php echo './data/tmp/use_dayilyusage.xlsx';?>" style="text-decoration:underline;">檔案下載</a></div>
+  		<!-- <div style="text-align:right;display:inline;"><a href="<?php echo './data/tmp/use_dayilyusage.xlsx'; ?>" style="text-decoration:underline;">檔案下載</a></div> -->
   		<div id="main_chart" style="height:700px;"></div>
       <div id="school_people"></div>
     </div>
