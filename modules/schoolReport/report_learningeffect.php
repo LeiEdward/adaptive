@@ -243,19 +243,17 @@ function arraytoJS($vData) {
 ?>
 <!DOCTYPE HTML>
 <html>
-<header>
-  <!-- 統計圖套件 -->
-  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/echarts-all-3.js"></script>
-  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts-stat/ecStat.min.js"></script>
-  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/dataTool.min.js"></script>
-  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/china.js"></script>
-  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/world.js"></script>
-  <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=ZUONbpqGBsYGXNIYHicvbAbM"></script>
-  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/bmap.min.js"></script>
-  <!-- Loading套件 -->
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/extras/loadingoverlay_progress/loadingoverlay_progress.min.js"></script>
-</header>
+<!-- 統計圖套件 -->
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/echarts-all-3.js"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts-stat/ecStat.min.js"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/dataTool.min.js"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/china.js"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/world.js"></script>
+<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=ZUONbpqGBsYGXNIYHicvbAbM"></script>
+<script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/bmap.min.js"></script>
+<!-- Loading套件 -->
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/extras/loadingoverlay_progress/loadingoverlay_progress.min.js"></script>
 <script>
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
   var oUserSelect = {
@@ -422,20 +420,9 @@ function arraytoJS($vData) {
 </script>
 <style>
   #main_cond label {cursor:pointer;}
-  #tab_indicator thead {cursor:pointer;}
-  #tab_indicator > * > * > * {vertical-align:middle;}
-  #tab_indicator > * > * > *:nth-of-type(1) {min-width:105px;}
-  #tab_indicator > * > * > *:nth-of-type(2) {width:85px;}
-  #tab_indicator > * > * > *:nth-of-type(3) {width:85px;}
-  #tab_indicator > * > * > *:nth-of-type(4) {width:230px;}
-  #tab_indicator > * > * > *:nth-of-type(5) {width:130px;}
-  #tab_indicator > * > * > *:nth-of-type(6) {width:130px;}
-  #tab_indicator > * > * > *:nth-of-type(7) {width:130px;}
-  #tab_indicator > * > * > *:nth-of-type(8) {width:135px;}
-  #tab_indicator > * > * > *:nth-of-type(9) {width:130px;}
 </style>
   <div class="content2-Box">
-	  <div class="path">目前位置：系統使用狀況報表</div>
+	  <div class="path">目前位置：各校學習狀況報表</div>
       <div class="choice-box">
         <div class="choice-title">報表</div>
           <ul class="choice work-cholic">
