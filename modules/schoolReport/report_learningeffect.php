@@ -277,7 +277,7 @@ function arraytoJS($vData) {
         textStyle: {fontWeight: 'bold', fontSize: '14'},
         title: {text: oUserSelect.CondSchool, subtext: oUserSelect.cond},
         tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
-        legend: {data: ['通過節總點人數', '未通過總人數', '全部人數']},
+        legend: {data: ['通過節點人數', '未通過總人數', '全部人數']},
         toolbox: {show : true,
           feature : {
             saveAsImage : {show: true, title: '圖片', name: '各校學習狀況-長條圖'}
@@ -286,7 +286,7 @@ function arraytoJS($vData) {
         grid: {left: '3%',right: '4%', bottom: '3%', containLabel: true},
         xAxis: {type:'value', boundaryGap:[0, 1]},
         yAxis: {type: 'category',data: oItem.Chart.school},
-        series: [{name:'通過節總點人數', type:'bar', data:oItem.Chart.passnode},
+        series: [{name:'通過節點人數', type:'bar', data:oItem.Chart.passnode},
                  {name:'未通過總人數', type:'bar',data:oItem.Chart.nopassnode},
                  {name:'全部人數', type:'bar',data:oItem.Chart.allnode}]
       };
@@ -299,7 +299,7 @@ function arraytoJS($vData) {
         var chart_people = echarts.init(oDivPeople);
         var oPeople = {
           // tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
-          legend: {orient: 'vertical',x: 'left', data:['通過節總點人數','未通過總人數']},
+          legend: {orient: 'vertical',x: 'left', data:['通過節點人數','未通過總人數']},
           series : [{ name: oItem.CondSchool,
                       type:'pie',
                       radius: ['50%', '70%'],
@@ -323,7 +323,7 @@ function arraytoJS($vData) {
                           }
                       },
                       data:[
-                        {value:oItem.Chart.passnode, name:'通過節總點人數' + oItem.Chart.passnode + '人'},
+                        {value:oItem.Chart.passnode, name:'通過節點人數' + oItem.Chart.passnode + '人'},
                         {value:oItem.Chart.nopassnode, name:'未通過總人數' + oItem.Chart.nopassnode + '人'}
                       ]
                   }
