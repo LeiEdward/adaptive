@@ -154,15 +154,17 @@ function getUserACL($vUserData) {
   $oCond->execute();
   $vCond = $oCond->fetchAll(\PDO::FETCH_ASSOC);
   foreach ($vCond as $tmpData) {
-    $vSchool[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['name']);
-    $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
-    $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
+    if ('190039' != $tmpData['organization_id'] && '190041' != $tmpData['organization_id']) {
+        $vSchool[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['name']);
+        $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
+        $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
 
-    $vNode = unserialize($tmpData['node']);
-    foreach ($vNode as $vData) {
-      foreach ($vData as $sGrade => $vNodeData) {
-        $vGrade[$sGrade] = $sGrade;
-        $vSubject[$vNodeData['name']] = $vNodeData['name'];
+      $vNode = unserialize($tmpData['node']);
+      foreach ($vNode as $vData) {
+        foreach ($vData as $sGrade => $vNodeData) {
+          $vGrade[$sGrade] = $sGrade;
+          $vSubject[$vNodeData['name']] = $vNodeData['name'];
+        }
       }
     }
   }

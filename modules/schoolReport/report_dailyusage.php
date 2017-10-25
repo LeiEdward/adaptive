@@ -55,7 +55,7 @@ function getUserACL($vUserData) {
   $vCiryArea = array();
   $sUserLevel = $vUserData['access_level'];
   $sManageCity = $vUserData['city_name'];
-  $sSQLCond = "SELECT city_name, city_area, postcode, name FROM report_dailyusage ";
+  $sSQLCond = "SELECT city_name, city_area, postcode, name, organization_id FROM report_dailyusage ";
   if ('41' == $sUserLevel) {
     $sSQLCond .=  "WHERE city_name IN('$sManageCity') ";
   }
@@ -63,9 +63,11 @@ function getUserACL($vUserData) {
   $oCond->execute();
   $vCond = $oCond->fetchAll(\PDO::FETCH_ASSOC);
   foreach ($vCond as $tmpData) {
-    $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
-    $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
-    $vSchool[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['name']);
+    if ('190039' != $tmpData['organization_id'] && '190041' != $tmpData['organization_id']) {
+      $vCityData[$tmpData['city_name']] = $tmpData['city_name'];
+      $vCiryArea[$tmpData['city_name']][$tmpData['city_area']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['city_name']);
+      $vSchool[$tmpData['city_name']][$tmpData['name']] = array($tmpData['postcode'], $tmpData['city_area'], $tmpData['name']);
+    }
   }
 }
 
@@ -280,7 +282,6 @@ function sub_name($sub) {
         var oDivPeople = document.getElementById("school_people");
         var oDivTime = document.getElementById("school_time");
         oDivPeople.style.height = '700px';
-        oDivTime.style.height = '700px';
         var chart_people = echarts.init(oDivPeople);
         var chart_time = echarts.init(oDivTime);
         var oPeople = {
@@ -317,38 +318,41 @@ function sub_name($sub) {
                   }
               ]
         };
-        var oTime = {
-          // mouseover 效果
-          // tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
-          legend: {orient: 'vertical',x: 'left', data:['影片瀏覽時間(小時)']},
-          series : [{ name: oItem.CondSchool,
-                      type:'pie',
-                      radius: ['50%', '70%'],
-                      avoidLabelOverlap: false,
-                      label: {
-                          normal: {
-                              show: false,
-                              position: 'center'
-                          },
-                          emphasis: {
-                              show: true,
-                              textStyle: {
-                                  fontSize: '30',
-                                  fontWeight: 'bold'
-                              }
-                          }
-                      },
-                      labelLine: {
-                          normal: {
-                              show: false
-                          }
-                      },
-                      data:[{value:oItem.Chart.spendtime, name:'影片瀏覽共' + oItem.Chart.spendtime + '小時'}]
-                  }
-              ]
-        };
+        if (0 != oItem.Chart.spendtime[0]) {
+          oDivTime.style.height = '700px';
+          var oTime = {
+            // mouseover 效果
+            // tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
+            legend: {orient: 'vertical',x: 'left', data:['影片瀏覽時間(小時)']},
+            series : [{ name: oItem.CondSchool,
+                        type:'pie',
+                        radius: ['50%', '70%'],
+                        avoidLabelOverlap: false,
+                        label: {
+                            normal: {
+                                show: false,
+                                position: 'center'
+                            },
+                            emphasis: {
+                                show: true,
+                                textStyle: {
+                                    fontSize: '30',
+                                    fontWeight: 'bold'
+                                }
+                            }
+                        },
+                        labelLine: {
+                            normal: {
+                                show: false
+                            }
+                        },
+                        data:[{value:oItem.Chart.spendtime, name:'影片瀏覽共' + oItem.Chart.spendtime + '小時'}]
+                    }
+                ]
+          };
+          chart_time.setOption(oTime, true);
+        }
         chart_people.setOption(oPeople, true);
-        chart_time.setOption(oTime, true);
     }
   }
   else {

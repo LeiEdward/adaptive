@@ -6,7 +6,7 @@
 <html>
 <style>
 ul, li {margin:0;padding: 0;list-style: none;}
-.main_content {height:400px;width:100%;overflow:hidden;overflow-y:auto;}
+.main_content {height:700px;width:100%;overflow:hidden;overflow-y:auto;}
 .main_content::-webkit-scrollbar-track{-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
 .main_content::-webkit-scrollbar{width: 12px;background-color: #F5F5F5;}
 .main_content::-webkit-scrollbar-thumb{border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
@@ -30,7 +30,7 @@ ul, li {margin:0;padding: 0;list-style: none;}
 
 .qa_content > ul > li > .name {color:rgb(0, 0, 255);}
 .qa_content > ul > li > .time {font-size:14px;color:rgb(157, 157, 157);}
-
+.stamp {height:320px;}
 .stamp-button {font-size:25px;cursor:pointer;text-decoration-line:underline;}
 </style>
 <script type="text/javascript" src="https://unpkg.com/vue"></script>
@@ -153,13 +153,13 @@ ul, li {margin:0;padding: 0;list-style: none;}
 						<section class="stamp">
 							<from>
 								<textarea id="main_editor" name="main_editor" rows="10"></textarea>
-								<button style="float:right;">發布</button>
+								<button class="btn04" style="float:right;">發布</button>
 							</from>
 						</section>
 						<section class="grid-item">
 							<div class="qa_title">
 								<ul>
-									<li><span class="name">王先生</span><span class="time">2017-10-23 14:00</span><span class="info">留言數(2)</span></li>
+									<li><span class="name">數學老師</span><span class="time">2017-10-23 14:00</span><span class="info">留言數(2)</span></li>
 									<li><span class="text">
 										老師覺得你接受知識的能力還是挺好的。可是你有時候管不住自己，課上總愛做小動作。字嘛，有些馬虎，這種學習態度可要不得呀！老師相信你一定會改掉的，是嗎？利用假期好好練字哦！
 										你平時不愛秀出自己，習慣了默默無聞，但對班級卻很關心。不過，你的字卻讓老師感到頭疼，每次都要「猜猜猜」，希望你能充分認識到這一點，把字寫得端端正正。
@@ -187,7 +187,7 @@ ul, li {margin:0;padding: 0;list-style: none;}
 						<section class="grid-item">
 							<div class="qa_title">
 								<ul>
-									<li><span class="name">王先生</span><span class="time">2017-10-23 14:00</span><span class="info">留言數(2)</span></li>
+									<li><span class="name">校長</span><span class="time">2017-10-23 14:00</span><span class="info">留言數(2)</span></li>
 									<li><span class="text">
 										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
 										不過，令人遺憾的是你的工作能力有待提高。老師真誠地希望你在工作上要向她人學習，做一名人見人愛的好學生。</span>
