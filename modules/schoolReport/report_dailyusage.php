@@ -47,6 +47,17 @@
                               'Chart' => $vChart
                       ));
 
+  function handleData($vReportData) {
+    if (empty($vReportData)) return array();
+    $vNewData = array();
+    foreach ($vReportData as $sKey => $vReport) {
+      if ('190039' != $vReport['organization_id'] && '190041' != $vReport['organization_id']) {
+        $vNewData[$sKey] = $vReport;
+      }
+    }
+    return $vNewData;
+  }
+
 function getUserACL($vUserData) {
   global $dbh, $vCityData, $vCiryArea, $vSchool;
 
@@ -196,17 +207,6 @@ function getReprotData($vUserData, $vData) {
   return $vReportData;
 }
 
-function handleData($vReportData) {
-  if (empty($vReportData)) return array();
-  $vNewData = array();
-  foreach ($vReportData as $sKey => $vReport) {
-    if ('190039' != $vReport['organization_id'] && '190041' != $vReport['organization_id']) {
-      $vNewData[$sKey] = $vReport;
-    }
-  }
-  return $vNewData;
-}
-
 function sub_name($sub) {
 	global $dbh;
 
@@ -251,7 +251,7 @@ function sub_name($sub) {
     $("#search_end").click(function() {
   	  $("#setrange").attr("checked",true);
   	});
-    if (null !== oItem.Chart) {
+    if (null !== oItem.Chart && 0 !== oItem.Chart.length) {
       // chart
       var dom = document.getElementById("main_chart");
       var myChart = echarts.init(dom);
@@ -358,6 +358,7 @@ function sub_name($sub) {
   else {
     $("#main_chart").text('查無資料!');
   }
+
   // 選擇縣市, 區及學校需變動
   $('#select_city').change(function() {
     if ('' === $('#select_city').val()) return

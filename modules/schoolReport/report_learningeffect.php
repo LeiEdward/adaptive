@@ -14,7 +14,7 @@
   $vReportData = getReprotData($vUserData, $_POST);
 
   // 整理報表資料
-  $vReportData = handleData($vReportData);
+  $vReportData = handleData($vUserData, $vReportData);
 
   // 取得圖表資料
   $vChart = getChartData($vReportData, $_POST);
@@ -85,9 +85,10 @@ function getReprotData($vUserData, $vData) {
   return $vReportData;
 }
 
-function handleData($vReportData) {
+function handleData($vUserData, $vReportData) {
   if (empty($vReportData)) return array();
   $vNewData = array();
+
   foreach ($vReportData as $sKey => $vReport) {
     if ('190039' != $vReport['organization_id'] && '190041' != $vReport['organization_id']) {
       $vNewData[$sKey] = $vReport;
@@ -272,7 +273,7 @@ function arraytoJS($vData) {
       $.LoadingOverlay("hide");
     });
 
-    if (null !== oItem.Chart) {
+    if (null !== oItem.Chart && 0 !== oItem.Chart.length) {
       var dom = document.getElementById("main_chart");
       var myChart = echarts.init(dom);
       var option = {
