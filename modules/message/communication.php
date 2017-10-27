@@ -147,13 +147,13 @@ ul, li {margin:0;padding: 0;list-style: none;}
         </from>
       </div> -->
  			<div class="right-box" style="width:100%;padding:0px 4px;">
-        <span class="stamp-button">我要發表</span>
+        <span class="stamp-button">發布消息</span>
         <article class="main_content">
           <div class="accordionPart grid">
 						<section class="stamp">
 							<from>
 								<textarea id="main_editor" name="main_editor" rows="10"></textarea>
-								<button class="btn04" style="float:right;">發布</button>
+								<button class="btn04" style="float:right;">確認</button>
 							</from>
 						</section>
 						<section class="grid-item">
