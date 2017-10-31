@@ -7,9 +7,13 @@
 <style>
   ul, li {margin:0;padding: 0;list-style: none;}
   .main_content {height:700px;width:100%;overflow:hidden;overflow-y:auto;}
-  .main_content::-webkit-scrollbar-track{-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
-  .main_content::-webkit-scrollbar{width: 12px;background-color: #F5F5F5;}
-  .main_content::-webkit-scrollbar-thumb{border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
+
+  .main_content::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
+  .main_content::-webkit-scrollbar {width: 10px;background-color: #F5F5F5;}
+  .main_content::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
+  .filebox::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
+  .filebox::-webkit-scrollbar {height:10px; width: 10px;background-color: #F5F5F5;}
+  .filebox::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
 
   .accordionPart > section {border:solid 1px #E3E3E3;}
   .accordionPart > section.grid-item {width:320px;float:left;}
@@ -18,26 +22,44 @@
   .accordionPart > section > div.qa_title {cursor: pointer;}
   .accordionPart > section > div.qa_content {display:none;}
 
+  /* 留言標題 */
   .qa_title > ul > li {position:relative;overflow:hidden;}
   .qa_title > ul > li > .name {color:rgb(0, 0, 255);}
-  .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
   .qa_title > ul > li > .time {padding:0px 4px;font-size:14px;}
   .qa_title > ul > li > .text {padding-left:1em;}
+  .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
+  .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;}
+  .qa_title > ul > li > .attachedfile > .ico {display:inline-block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;background-image: url("./images/toolbar/file.png");}
+  .qa_title > ul > li > .attachedfile > .filename {flex:80;display:flex;justify-content:stretch;overflow:hidden;white-space: nowrap;}
+  .qa_title > ul > li > .attachedfile > .filename > span {margin-right:4px;overflow:hidden;text-overflow:ellipsis;text-decoration:underline;}
+  .qa_title > ul > li > .attachedfile > .filename > span:hover {color:rgb(0, 0, 255);}
 
+  /* 留言回覆 */
   .qa_content > ul > li > .name {color:rgb(0, 0, 255);}
   .qa_content > ul > li > .time {font-size:14px;color:rgb(157, 157, 157);}
 
-  .stamp {display:block;margin-bottom:4px;overflow-y:auto;background-color:#F8F8F8;}
+  .stamp {display:block;max-width:1150px;margin-bottom:4px;overflow-y:auto;background-color:#F8F8F8;}
   .stamp > textarea {resize:none;}
   .stamp-button {cursor:pointer;margin:0px;margin-bottom:4px;}
 
   .toolbar {display:table;}
-  .toolbar > li {position:relative;display:table-cell;vertical-align: middle;height:40px;width:25px;cursor:pointer;}
+  .toolbar > li {position:relative;display:table-cell;vertical-align: middle;height:40px;cursor:pointer;}
+  .toolbar > li:nth-of-type(1) {cursor:text;}
   .toolbar > li::after {content:"|";display:block;position:absolute;top:2px;right:-3px;color:#BCBCBC;}
+  .toolbar > li:nth-of-type(1)::after ,.toolbar > li:nth-of-type(2)::after, .toolbar > li:last-child::after {display:none;}
   .toolbar > li > i {display:block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;}
   .toolbar > li > i:hover {background-color:#E7E7E7;border:1px solid #999;}
   .toolbar > li > i.pic {background-image: url("./images/toolbar/picture.png");}
   .toolbar > li > i.file {opacity:0.6;background-image: url("./images/toolbar/addfile.png");}
+  .toolbar > li.fromto > select {height:auto;margin-top:5px;}
+  .tooltip {font-size:14px;}
+
+  .filebox {display:block;overflow:hidden;overflow-x:auto;white-space:nowrap;height:150px;height:110px;}
+  .filebox > li {display:inline-block;vertical-align:top;width:150px;margin-right:4px;cursor:pointer;}
+  .filebox > li.fileupload > div {position:relative;}
+  .filebox > li.fileupload > div > img {position:absolute;top:25px;left:65px;}
+  .filebox > li.fileupload > div > span {display:block;position:absolute;top:50px;width:150px;overflow:hidden;text-overflow:ellipsis;}
+    .delete {position:absolute;top:0px;right:0px;width:50px;height:50px;display:none;}
 
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
@@ -77,7 +99,7 @@
 
 		$(document).ready(function() {
 			// Picture Zoom
-			// $('.qaimg').elevateZoom({scrollZoom: true, tint:false, tintColour:'#F90', tintOpacity:0.5});
+			// $('.imgupload > img').elevateZoom({scrollZoom: true, tint:false, tintColour:'#F90', tintOpacity:0.5});
 
 			// CKEDITOR
 			// CKEDITOR.replace('edit_text');
@@ -134,7 +156,7 @@
 
       // 區塊收合
 			$grid.on('click','.grid-item', function(e) {
-        if ($(e.target).is('input') || $(e.target).closest('div').hasClass('qa_content')) {
+        if ($(e.target).is('input') || $(e.target).closest('div').hasClass('qa_content') || $(e.target).parent().hasClass('filename')) {
           return;
         }
 
@@ -161,16 +183,33 @@
           </ul>
    		 </div>
  			<div class="right-box" style="width:100%;margin:0px auto;">
-        <button class="btn04 stamp-button">發布消息</button>
+        <button class="btn06 stamp-button" style="width:100px;">發布消息</button>
         <article class="main_content">
           <div class="accordionPart grid">
 						<section class="stamp">
               <ul class="toolbar">
-                <li><i class="pic"></i></li>
+                <li>TO:</li>
+                <li class="fromto">
+                  <select>
+                    <option value="">全部家長</option>
+                    <option value="">小明家長</option>
+                    <option value="">小美家長</option>
+                  <select>
+                </li>
+                <li><i class="pic" alt="上傳圖片"></i></li>
                 <li><i class="file"></i></li>
               </ul>
 							<textarea id="edit_text" name="edit_text" class="auto-height"></textarea>
-              <span></span>
+              <ul class="filebox">
+                <li class="imgupload"><img src="./include/srcoe.jpg" /></li>
+                <li class="fileupload">
+                  <div>
+                    <img src="./images/toolbar/addfile.png" />
+                    <span>10月期中考.xsl</span>
+                  </div>
+                </li>
+              </ul>
+              <!-- <span class="tooltip">刪除圖片/檔案</span> -->
 							<button id="editor_btn" name="editor_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
 						<section class="grid-item">
@@ -183,9 +222,18 @@
 										你平時不愛秀出自己，習慣了默默無聞，但對班級卻很關心。不過，你的字卻讓老師感到頭疼，每次都要「猜猜猜」，希望你能充分認識到這一點，把字寫得端端正正。
 										真誠地希望你能在學習上激活所有的腦細胞，我們一起努力，你準備好了嗎？
                     </span>
-                    <span class="info">留言數(2)</span>
 									</li>
-									<!-- <li><img class="qaimg" /></li> -->
+                  <li>
+                    <span class="attachedfile">
+                      <i class="ico"></i>
+                      <span class="filename">
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                      </span>
+                      <span class="info">留言數(2)</span>
+                    </span>
+                  </li>
 								</ul>
 							</div>
 							<div class="qa_content">
@@ -213,9 +261,18 @@
 										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
 										不過，令人遺憾的是你的工作能力有待提高。老師真誠地希望你在工作上要向她人學習，做一名人見人愛的好學生。
                     </span>
-                    <span class="info">留言數(2)</span>
 									</li>
-									<!-- <li><img class="qaimg" /></li> -->
+									<li>
+                    <span class="attachedfile">
+                      <i class="ico"></i>
+                      <span class="filename">
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                      </span>
+                      <span class="info">留言數(2)</span>
+                    </span>
+                  </li>
 								</ul>
 							</div>
 							<div class="qa_content">
@@ -241,7 +298,17 @@
 									<li><span class="text">學期成績</span></li>
 									<li>
                     <img class="qaimg" src="./include/srcoe.jpg" data-zoom-image="./include/srcoe.jpg" />
-                    <span class="info">留言數(2)</span>
+                  </li>
+                  <li>
+                    <span class="attachedfile">
+                      <i class="ico"></i>
+                      <span class="filename">
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                      </span>
+                      <span class="info">留言數(2)</span>
+                    </span>
                   </li>
 								</ul>
 							</div>
@@ -270,9 +337,18 @@
 										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
 										不過，令人遺憾的是你的工作能力有待提高。老師真誠地希望你在工作上要向她人學習，做一名人見人愛的好學生。
                     </span>
-                    <span class="info">留言數(2)</span>
 									</li>
-									<!-- <li><img class="qaimg" /></li> -->
+                  <li>
+                    <span class="attachedfile">
+                      <i class="ico"></i>
+                      <span class="filename">
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                      </span>
+                      <span class="info">留言數(2)</span>
+                    </span>
+                  </li>
 								</ul>
 							</div>
 							<div class="qa_content">
@@ -300,9 +376,18 @@
 										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
 										不過，令人遺憾的是你的工作能力有待提高。老師真誠地希望你在工作上要向她人學習，做一名人見人愛的好學生。
                     </span>
-                    <span class="info">留言數(2)</span>
 									</li>
-									<!-- <li><img class="qaimg" /></li> -->
+                  <li>
+                    <span class="attachedfile">
+                      <i class="ico"></i>
+                      <span class="filename">
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                        <span>filenanme</span>
+                      </span>
+                      <span class="info">留言數(2)</span>
+                    </span>
+                  </li>
 								</ul>
 							</div>
 							<div class="qa_content">
