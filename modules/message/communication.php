@@ -15,6 +15,7 @@
   .filebox::-webkit-scrollbar {height:10px; width: 10px;background-color: #F5F5F5;}
   .filebox::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
 
+  /* 留言浮動框 */
   .accordionPart > section {border:solid 1px #E3E3E3;}
   .accordionPart > section.grid-item {width:320px;float:left;}
   .accordionPart > section.open {width:100%;float:left;}
@@ -38,10 +39,12 @@
   .qa_content > ul > li > .name {color:rgb(0, 0, 255);}
   .qa_content > ul > li > .time {font-size:14px;color:rgb(157, 157, 157);}
 
+  /* 留言給家長 */
   .stamp {display:block;max-width:1150px;margin-bottom:4px;overflow-y:auto;background-color:#F8F8F8;}
   .stamp > textarea {resize:none;}
   .stamp-button {cursor:pointer;margin:0px;margin-bottom:4px;}
 
+  /* 留言功能 */
   .toolbar {display:table;}
   .toolbar > li {position:relative;display:table-cell;vertical-align: middle;height:40px;cursor:pointer;}
   .toolbar > li:nth-of-type(1) {cursor:text;}
@@ -51,15 +54,15 @@
   .toolbar > li > i:hover {background-color:#E7E7E7;border:1px solid #999;}
   .toolbar > li > i.pic {background-image: url("./images/toolbar/picture.png");}
   .toolbar > li > i.file {opacity:0.6;background-image: url("./images/toolbar/addfile.png");}
-  .toolbar > li.fromto > select {height:auto;margin-top:5px;}
-  .tooltip {font-size:14px;}
+  .toolbar > li.messageto > select {height:28px;margin-top:5px;}
 
+  /* 留言上傳檔案 */
   .filebox {display:block;overflow:hidden;overflow-x:auto;white-space:nowrap;height:150px;height:110px;}
-  .filebox > li {display:inline-block;vertical-align:top;width:150px;margin-right:4px;cursor:pointer;}
+  .filebox > li {position:relative;display:inline-block;vertical-align:top;width:150px;margin-right:4px;cursor:pointer;}
   .filebox > li.fileupload > div {position:relative;}
-  .filebox > li.fileupload > div > img {position:absolute;top:25px;left:65px;}
+  .filebox > li.fileupload > div > img {position:absolute;top:36px;left:45px;opacity: 0.2;}
   .filebox > li.fileupload > div > span {display:block;position:absolute;top:50px;width:150px;overflow:hidden;text-overflow:ellipsis;}
-    .delete {position:absolute;top:0px;right:0px;width:50px;height:50px;display:none;}
+  .filebox > .delete::after {content:"";position:absolute;top:0px;right:0px;width:10px;height:10px;background-image: url("./images/toolbar/del.png");background-size:100%;background-position:center;background-repeat:no-repeat;}
 
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
@@ -92,17 +95,21 @@
           alert('無法下載, 請稍後嘗試!');
         },
         success: function(response) {
-
         }
       });
+    });
+
+    $('.filebox > li').click(function (e) {
+      var sX = $(this).position().left;
+      var sY = $(this).position().top;
+      if (158 <= (e.pageX - sX) && 250 <= (e.pageY - sY)) {
+        // delete
+      }
     });
 
 		$(document).ready(function() {
 			// Picture Zoom
 			// $('.imgupload > img').elevateZoom({scrollZoom: true, tint:false, tintColour:'#F90', tintOpacity:0.5});
-
-			// CKEDITOR
-			// CKEDITOR.replace('edit_text');
 
 			// Vue.component('todo-item', {
 			//   props: ['todo'],
@@ -118,7 +125,6 @@
 			//     ]
 			//   }
 			// })
-
 
 			// masonry
 			var $grid = $('.grid').masonry({
@@ -183,13 +189,13 @@
           </ul>
    		 </div>
  			<div class="right-box" style="width:100%;margin:0px auto;">
-        <button class="btn06 stamp-button" style="width:100px;">發布消息</button>
+        <button class="btn06 stamp-button" style="width:120px;">留言給家長</button>
         <article class="main_content">
           <div class="accordionPart grid">
 						<section class="stamp">
               <ul class="toolbar">
                 <li>TO:</li>
-                <li class="fromto">
+                <li class="messageto">
                   <select>
                     <option value="">全部家長</option>
                     <option value="">小明家長</option>
@@ -201,15 +207,14 @@
               </ul>
 							<textarea id="edit_text" name="edit_text" class="auto-height"></textarea>
               <ul class="filebox">
-                <li class="imgupload"><img src="./include/srcoe.jpg" /></li>
-                <li class="fileupload">
+                <li class="imgupload delete"><img src="./include/srcoe.jpg" /></li>
+                <li class="fileupload delete">
                   <div>
-                    <img src="./images/toolbar/addfile.png" />
+                    <img src="./images/toolbar/file.png" />
                     <span>10月期中考.xsl</span>
                   </div>
                 </li>
               </ul>
-              <!-- <span class="tooltip">刪除圖片/檔案</span> -->
 							<button id="editor_btn" name="editor_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
 						<section class="grid-item">
@@ -297,7 +302,7 @@
 									<li><span class="name">實驗6年9班老師</span><span class="time">2017-10-23 14:00</span></li>
 									<li><span class="text">學期成績</span></li>
 									<li>
-                    <img class="qaimg" src="./include/srcoe.jpg" data-zoom-image="./include/srcoe.jpg" />
+                    <img class="qaimg" src="./include/srcoe.jpg" />
                   </li>
                   <li>
                     <span class="attachedfile">
