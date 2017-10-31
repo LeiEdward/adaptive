@@ -10,56 +10,92 @@
   // 取得 user 資料
   $vUserData = get_object_vars($_SESSION['user_data']);
 
+  // 統一接變數
+  $vCond = array();
+  if ('' !== $_POST['time']) {
+    $vCond['time'] = $_POST['time'];
+  }
+  if ('' !== $_POST['search_start']) {
+    $vCond['search_start'] = $_POST['search_start'];
+  }
+  if ('' !== $_POST['search_end']) {
+    $vCond['search_end'] = $_POST['search_end'];
+  }
+  if ('' !== $_POST['hiCity']) {
+    $vCond['hiCity'] = $_POST['hiCity'];
+  }
+  if ('' !== $_POST['hiArea']) {
+    $vCond['hiArea'] = $_POST['hiArea'];
+  }
+  if ('' !== $_POST['hiSchool']) {
+    $vCond['hiSchool'] = $_POST['hiSchool'];
+  }
+  if ('' !== $_POST['hiSubject']) {
+    $vCond['hiSubject'] = $_POST['hiSubject'];
+  }
+  if ('' !== $_POST['hiGrade']) {
+    $vCond['hiGrade'] = $_POST['hiGrade'];
+  }
+
   // 取得報表資料
-  $vReportData = getReprotData($vUserData, $_POST);
+  $vReportData = getReprotData($vCond);
 
   // 整理報表資料
   $vReportData = handleData($vReportData);
 
   // 取得圖表資料
-  $vChart = getChartData($vReportData, $_POST);
+  $vChart = getChartData($vReportData, $vCond);
+
+  if (isset($_GET['download']) && 'report_learningeffect' === $_GET['download']) {
+    make_excel($vReportData);
+  }
 
   // 權限控制開放搜尋內容
-  getUserACL($vUserData);
+  getUserACL();
 
   // 下拉選單條件設定
   $vSelect = getSelector($vCityData, $vGrade, $vSubject);
 
   // 時間範圍
-  $sUserSearch = getCondetionRange($_POST);
+  $sUserSearch = getCondetionRange($vCond);
 
   // 整理資料, 統一變數傳至HTML
-  $sJSOject = arraytoJS(array('City' => $vCityData,
+  $sJSOject = arraytoJS(array('UserCode' => $vUserData['uid'],
+                              'City' => $vCityData,
                               'CityArea' => $vCiryArea,
                               'School' => $vSchool,
                               'Grade' => $vGrade,
                               'Subject' => $vSubject,
                               'UserCond' => $sUserSearch,
-                              'CondCity' => $_POST['hiCity'],
-                              'CondArea' => $_POST['hiArea'],
-                              'CondSchool' => $_POST['hiSchool'],
+                              'CondCity' => $vCond['hiCity'],
+                              'CondArea' => $vCond['hiArea'],
+                              'CondSchool' => $vCond['hiSchool'],
+                              'CondGrade' => $vCond['hiGrade'],
+                              'CondSubject' => $vCond['hiSubject'],
                               'Chart' => $vChart));
 
-function getReprotData($vUserData, $vData) {
-  global $dbh;
+function getReprotData($vData) {
+  global $dbh, $vUserData;
 
   $sUserLevel = $vUserData['access_level'];
   $sManageCity = $vUserData['city_name'];
   $sSemeYear = $vUserData['semeYear'];
   $sCityCode = $vUserData['city_code'];
 
-  $sReprotSQL = "SELECT * FROM report_dailyusage ";
+  $sReprotSQL = "SELECT * FROM report_dailyusage";
+
   switch ($sUserLevel) {
     case '41': // 縣市政府
-      $sReprotSQL .= "WHERE city_name IN('$sManageCity') ";
-      if(isset($vData['time'])) $sReprotSQL .= " AND ";
+      $sReprotSQL .= " WHERE city_name IN('$sManageCity') ";
+      if(isset($vData['time']) || isset($vData['hiCity'])) $sReprotSQL .= " AND ";
       break;
 
     case '51': // 教育部
-      if(isset($vData['time'])) $sReprotSQL .= " WHERE ";
+      if(isset($vData['time']) || isset($vData['hiCity'])) $sReprotSQL .= " WHERE ";
       break;
   }
-  if(isset($vData['time'])) {
+
+  if (isset($vData['time'])) {
     if ('search' === $vData['time']) {
       $sReprotSQL .= ' (datetime_log >= "'.$vData['search_start'].'" AND datetime_log <= "'.$vData['search_end'].' 23:59:59") ';
     }
@@ -67,16 +103,26 @@ function getReprotData($vUserData, $vData) {
       $sReprotSQL .= ' datetime_log > "'.$vData['time'].' "';
     }
   }
+
+  if(!empty($vData['time']) && !empty($vData['hiCity'])) $sReprotSQL .= " AND ";
+
   if (isset($vData['hiCity']) && !empty($vData['hiCity'])) {
-    $sReprotSQL .= ' AND city_name IN("'.$vData['hiCity'].'") ';
+    $sReprotSQL .= ' city_name IN("'.$vData['hiCity'].'") ';
   }
+
+  if(!empty($vData['hiCity']) && !empty($vData['hiArea'])) $sReprotSQL .= " AND ";
+
   if (isset($vData['hiArea']) && !empty($vData['hiArea'])) {
-    $sReprotSQL .= ' AND city_area IN("'.$vData['hiArea'].'") ';
+    $sReprotSQL .= ' city_area IN("'.$vData['hiArea'].'") ';
   }
+
+  if(!empty($vData['hiArea']) && !empty($vData['hiSchool'])) $sReprotSQL .= " AND ";
+
   if (isset($vData['hiSchool']) && !empty($vData['hiSchool'])) {
-    $sReprotSQL .= ' AND name IN("'.$vData['hiSchool'].'") ';
+    $sReprotSQL .= ' name IN("'.$vData['hiSchool'].'") ';
   }
-  $sReprotSQL .= " GROUP BY organization_id ORDER BY organization_id";
+
+  $sReprotSQL .= " GROUP BY organization_id ORDER BY postcode DESC";
 
   $oReprot = $dbh->prepare($sReprotSQL);
   $oReprot->execute();
@@ -87,6 +133,7 @@ function getReprotData($vUserData, $vData) {
 
 function handleData($vReportData) {
   if (empty($vReportData)) return array();
+
   $vNewData = array();
   foreach ($vReportData as $sKey => $vReport) {
     if ('190039' != $vReport['organization_id'] && '190041' != $vReport['organization_id']) {
@@ -97,43 +144,74 @@ function handleData($vReportData) {
 }
 
 function getChartData($vReportData, $vCond) {
+  if (empty($vReportData)) return;
+
+  global $vUserData;
+  $sUserLevel = $vUserData['access_level'];
+  switch ($sUserLevel) {
+    case '41': // 縣市政府
+      $sField = 'name';
+      break;
+
+    case '51': // 教育部
+      //預設看縣市
+      $sField = 'city_name';
+
+      // 選擇城市要看區
+      if ('' != $vCond['hiCity']) {
+        $sField = 'city_area';
+      }
+
+      // 選擇區要看學校
+      if ('' != $vCond['hiArea']) {
+        $sField = 'name';
+      }
+      break;
+  }
+
   foreach($vReportData as $vReport) {
-    if ('' != $vReport['node']) {
+     if ('' != $vReport['node']) {
       $vNode = unserialize($vReport['node']);
-      $sName = preg_replace('/\t|\s+/', '', $vReport['name']);
-      $vChart['school'][] = $sName;
-      $tmpDatat = array();
       foreach ($vNode as $vData) {
         foreach ($vData as $sGrade => $vNodeData) {
-          if (!empty($vCond['hiSubject']) && $vCond['hiSubject'] == $vNodeData['name']) {
-            $tmpDatat[$vReport['organization_id']]['nopassnode'] += $vNodeData['nopassnode'];
-            $tmpDatat[$vReport['organization_id']]['passnode'] += $vNodeData['passnode'];
-            $tmpDatat[$vReport['organization_id']]['allnode'] += $vNodeData['allnode'];
+          if (!empty($vCond['hiSubject']) && $vCond['hiSubject'] == $vNodeData['name'] && empty($vCond['hiGrade'])) {
+            $tmpData[$vReport[$sField]]['nopassnode'] += $vNodeData['nopassnode'];
+            $tmpData[$vReport[$sField]]['passnode'] += $vNodeData['passnode'];
+            $tmpData[$vReport[$sField]]['allnode'] += $vNodeData['allnode'];
           }
-
-          if (!empty($vCond['hiGrade']) && $vCond['hiGrade'] == $sGrade) {
-            $tmpDatat[$vReport['organization_id']]['nopassnode'] += $vNodeData['nopassnode'];
-            $tmpDatat[$vReport['organization_id']]['passnode'] += $vNodeData['passnode'];
-            $tmpDatat[$vReport['organization_id']]['allnode'] += $vNodeData['allnode'];
+          elseif(!empty($vCond['hiGrade']) && $vCond['hiGrade'] == $sGrade  && empty($vCond['hiSubject'])) {
+            $tmpData[$vReport[$sField]]['nopassnode'] += $vNodeData['nopassnode'];
+            $tmpData[$vReport[$sField]]['passnode'] += $vNodeData['passnode'];
+            $tmpData[$vReport[$sField]]['allnode'] += $vNodeData['allnode'];
           }
-
-          if(empty($vCond['hiSubject']) && empty($vCond['hiGrade'])) {
-            $tmpDatat[$vReport['organization_id']]['nopassnode'] += $vNodeData['nopassnode'];
-            $tmpDatat[$vReport['organization_id']]['passnode'] += $vNodeData['passnode'];
-            $tmpDatat[$vReport['organization_id']]['allnode'] += $vNodeData['allnode'];
+          elseif(empty($vCond['hiSubject']) && empty($vCond['hiGrade'])) {
+            $tmpData[$vReport[$sField]]['nopassnode'] += $vNodeData['nopassnode'];
+            $tmpData[$vReport[$sField]]['passnode'] += $vNodeData['passnode'];
+            $tmpData[$vReport[$sField]]['allnode'] += $vNodeData['allnode'];
+          }
+          elseif($vCond['hiGrade'] == $sGrade && $vCond['hiSubject'] == $vNodeData['name']) {
+            $tmpData[$vReport[$sField]]['nopassnode'] += $vNodeData['nopassnode'];
+            $tmpData[$vReport[$sField]]['passnode'] += $vNodeData['passnode'];
+            $tmpData[$vReport[$sField]]['allnode'] += $vNodeData['allnode'];
           }
         }
       }
-      $vChart['nopassnode'][] = $tmpDatat[$vReport['organization_id']]['nopassnode'];
-      $vChart['passnode'][] = $tmpDatat[$vReport['organization_id']]['passnode'];
-      $vChart['allnode'][] = $tmpDatat[$vReport['organization_id']]['allnode'];
+    }
+  }
+  $vChart = array();
+  if (!empty($tmpData)) {
+    foreach ($tmpData as $sKey => $vData) {
+      $vChart['category'][] = $sKey;
+      $vChart['nopassnode'][] = $tmpData[$sKey]['nopassnode'];
+      $vChart['passnode'][] = $tmpData[$sKey]['passnode'];
+      $vChart['allnode'][] = $tmpData[$sKey]['allnode'];
     }
   }
   return $vChart;
 }
 
-function getUserACL($vUserData) {
-  global $dbh, $vCityData, $vCiryArea, $vSchool, $vGrade, $vSubject;
+function getUserACL() {
+  global $dbh, $vUserData, $vCityData, $vCiryArea, $vSchool, $vGrade, $vSubject;
 
   $vSchool = array();
   $vCityData = array();
@@ -143,13 +221,14 @@ function getUserACL($vUserData) {
   $sSQLCond = "SELECT city_name, city_area, postcode, name, node, organization_id FROM report_dailyusage ";
   switch($sUserLevel) {
     case '41':
-      $sSQLCond .=  "WHERE city_name IN('$sManageCity') AND LENGTH(node) > 1";
+      $sSQLCond .= "WHERE city_name IN('$sManageCity') AND LENGTH(node) > 1";
       break;
 
     default:
-      $sSQLCond .=  "WHERE LENGTH(node) > 1";
+      $sSQLCond .= "WHERE LENGTH(node) > 1";
       break;
   }
+  $sSQLCond .= ' ORDER BY postcode, city_area';
   $oCond = $dbh->prepare($sSQLCond);
   $oCond->execute();
   $vCond = $oCond->fetchAll(\PDO::FETCH_ASSOC);
@@ -242,10 +321,45 @@ function arraytoJS($vData) {
   }
   return $sJSOject;
 }
+
+function make_excel($vReportData) {
+  global $vUserData;
+
+  $date = date('Ymd_His');
+  $excel_content[0] = array('學校代號', '縣市', '區', '學校', '年級', '科目', '通過節點人數', '未通過總人數', '總人數');
+
+  foreach ($vReportData as $vReport) {
+    if('' != $vReport['node']) {
+      $vNode = unserialize($vReport['node']);
+        foreach ($vNode as $vData) {
+          foreach ($vData as $sGrade => $vNodeData) {
+            if ('' !== $vData['passnode'] || !isset($vData['passnode'])) $vData['passnode'] = '0';
+            if ('' !== $vData['nopassnode'] || !isset($vData['nopassnode'])) $vData['nopassnode'] = '0';
+            if ('' !== $vData['allnode'] || !isset($vData['allnode'])) $vData['allnode'] = '0';
+            $excel_content[] = array($vReport['organization_id'],
+                                     $vReport['city_name'],
+                                     $vReport['city_area'],
+                                     $vReport['name'],
+                                     $sGrade.'年級',
+                                     $vNodeData['name'],
+                                     $vNodeData['passnode'],
+                                     $vNodeData['nopassnode'],
+                                     $vNodeData['allnode']);
+          }
+        }
+    }
+  }
+  $objPHPExcel = new PHPExcel();
+  $objPHPExcel->setActiveSheetIndex(0);
+  $objPHPExcel->getActiveSheet()->fromArray($excel_content, null, 'A1');
+  $objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
+  $filename= 'report_learningeffect_'.$vUserData['uid'].'.xlsx';
+  $objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
+  $objWriter->save(_ADP_PATH.'data/tmp/'.$filename);
+}
 ?>
 <!DOCTYPE HTML>
 <html>
-<!-- 統計圖套件 -->
 <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/echarts-all-3.js"></script>
 <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts-stat/ecStat.min.js"></script>
 <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/dataTool.min.js"></script>
@@ -253,7 +367,6 @@ function arraytoJS($vData) {
 <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/world.js"></script>
 <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=ZUONbpqGBsYGXNIYHicvbAbM"></script>
 <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/extension/bmap.min.js"></script>
-<!-- Loading套件 -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/extras/loadingoverlay_progress/loadingoverlay_progress.min.js"></script>
 <script>
@@ -262,22 +375,47 @@ function arraytoJS($vData) {
     cond: oItem.UserCond,
     city: oItem.CondCity,
     area: oItem.CondArea,
-    school: (!!oItem.CondSchool) ? oItem.CondSchool : '全部學校'
+    grade: oItem.CondGrade,
+    subject: oItem.CondSubject,
   };
+
+  var sTitle = '';
+  if ('' !== oUserSelect.city && null !== oUserSelect.city) {
+    sTitle = oUserSelect.city + ' ';
+  }
+  if ('' !== oUserSelect.area && null !== oUserSelect.area) {
+    sTitle += oUserSelect.area + ' ';
+  }
+  if ('' !== oUserSelect.subject && null !== oUserSelect.subject) {
+    sTitle += oUserSelect.subject + '科 ';
+  }
+  if ('' !== oUserSelect.grade && null !== oUserSelect.grade) {
+    sTitle += oUserSelect.grade + '年級';
+  }
+  sTitle += ' ';
+
+  oUserSelect.school = (!!oItem.CondSchool) ? oItem.CondSchool : sTitle;
 
 	$(function() {
     $.LoadingOverlay("show");
 
     $(document).ready(function() {
+      // $('#select_city').val(oUserSelect.city);
+      // $('#select_area').val(oUserSelect.area);
+      // $('#select_school').val(oUserSelect.school);
+      $('#select_subject').val(oUserSelect.subject);
+      $('#select_grade').val(oUserSelect.grade);
+      $('#hiSubject').val(oUserSelect.subject);
+      $('#hiGrade').val(oUserSelect.grade);
       $.LoadingOverlay("hide");
     });
 
-    if (null !== oItem.Chart) {
+    if (null !== oItem.Chart && 0 !== oItem.Chart.length) {
       var dom = document.getElementById("main_chart");
       var myChart = echarts.init(dom);
       var option = {
         textStyle: {fontWeight: 'bold', fontSize: '14'},
-        title: {text: oUserSelect.CondSchool, subtext: oUserSelect.cond},
+        title: {text: oUserSelect.school, subtext: oUserSelect.cond},
         tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
         legend: {data: ['通過節點人數', '未通過總人數', '全部人數']},
         toolbox: {show : true,
@@ -287,7 +425,7 @@ function arraytoJS($vData) {
         },
         grid: {left: '3%',right: '4%', bottom: '3%', containLabel: true},
         xAxis: {type:'value', boundaryGap:[0, 1]},
-        yAxis: {type: 'category',data: oItem.Chart.school},
+        yAxis: {type: 'category',data: oItem.Chart.category},
         series: [{name:'通過節點人數', type:'bar', data:oItem.Chart.passnode},
                  {name:'未通過總人數', type:'bar',data:oItem.Chart.nopassnode},
                  {name:'全部人數', type:'bar',data:oItem.Chart.allnode}]
@@ -295,10 +433,9 @@ function arraytoJS($vData) {
       myChart.setOption(option, true);
 
       // 圓餅圖 搜尋條件要選學校才出現
-      if (('' !== oItem.CondSchool && 'string' === typeof oItem.CondSchool) || 1 === oItem.Chart.school.length) {
+      if (('' !== oItem.CondSchool && 'string' === typeof oItem.CondSchool) || 1 === oItem.Chart.category.length) {
         var oDivPeople = document.getElementById("school_people");
         oDivPeople.style.height = '700px';
-        var chart_people = echarts.init(oDivPeople);
         var oPeople = {
           // tooltip: {trigger: 'item', formatter: "{a} <br/>{b}: {c} ({d}%)"},
           legend: {orient: 'vertical',x: 'left', data:['通過節點人數','未通過總人數']},
@@ -331,6 +468,7 @@ function arraytoJS($vData) {
                   }
               ]
         };
+        var chart_people = echarts.init(oDivPeople);
         chart_people.setOption(oPeople, true);
       }
     }
@@ -405,18 +543,21 @@ function arraytoJS($vData) {
       $('#hiGrade').val($('#select_grade').val());
     });
 
-    // if ('' !== oUserSelect.city) {
-    //   $('#select_city').val(oUserSelect.city);
-    //   $('#hiCity').val(oUserSelect.city);
-    // }
-    // if ('' !== oUserSelect.area) {
-    //   $('#select_area').val(oUserSelect.area);
-    //   $('#hiArea').val(oUserSelect.area);
-    // }
-    // if ('' !== oUserSelect.school) {
-    //   $('#select_school').val(oUserSelect.school);
-    //   $('#hiSchool').val(oUserSelect.school);
-    // }
+    $('#download_file').click(function () {
+      $.ajax({
+        url: 'modules.php?op=modload&name=schoolReport&file=report_learningeffect',
+        type: 'GET',
+        data: {
+          download: 'report_learningeffect'
+        },
+        error: function(xhr) {
+          alert('無法下載, 請稍後嘗試!');
+        },
+        success: function(response) {
+          window.location.href = './data/tmp/report_learningeffect_' +  oItem.UserCode + '.xlsx';
+        }
+      });
+    });
 
 	});
 </script>
@@ -455,7 +596,7 @@ function arraytoJS($vData) {
 			    <input type="submit" name="sreach" class="btn02" style="width:70px; display: inline;" value="查詢">
 	      </form>
 		  <font class="color-blue">搜尋範圍：<?php echo $sUserSearch; ?></font>
-  		<!-- <div style="text-align:right;display:inline;"><a href="<?php echo './data/tmp/use_dayilyusage.xlsx'; ?>" style="text-decoration:underline;">檔案下載</a></div> -->
+      <div id="download_file" style="text-align:right;display:inline;cursor:pointer;"><a>檔案下載</a></div>
   		<div id="main_chart" style="height:700px;"></div>
       <div id="school_people"></div>
     </div>

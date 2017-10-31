@@ -29,6 +29,5 @@ CKEDITOR.editorConfig = function( config ) {
 	// Dialog windows are also simplified.
 	config.removeDialogTabs = 'link:advanced';
 
-	// config.extraPlugins = 'uploadimage';
-	config.uploadUrl = '';
+	config.uploadUrl = 'modules.php?op=modload&name=message&file=uploadfile';
 };
