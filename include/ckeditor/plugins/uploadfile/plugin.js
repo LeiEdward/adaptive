@@ -16,7 +16,7 @@
 
 			var fileTools = CKEDITOR.fileTools,
 				uploadUrl = fileTools.getUploadUrl( editor.config );
-
+				console.log(uploadUrl);
 			if ( !uploadUrl ) {
 				CKEDITOR.error( 'uploadfile-config' );
 				return;
