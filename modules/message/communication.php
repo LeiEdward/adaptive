@@ -50,7 +50,8 @@
   .toolbar > li:nth-of-type(1) {cursor:text;}
   .toolbar > li::after {content:"|";display:block;position:absolute;top:2px;right:-3px;color:#BCBCBC;}
   .toolbar > li:nth-of-type(1)::after ,.toolbar > li:nth-of-type(2)::after, .toolbar > li:last-child::after {display:none;}
-  .toolbar > li > i {display:block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;}
+  .toolbar > li > i {position:relative;display:block;height:25px;width:25px;overflow:hidden;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;}
+  .toolbar > li > i > input {position:absolute;top:0px;left:0px;opacity:0;max-width:25px;}
   .toolbar > li > i:hover {background-color:#E7E7E7;border:1px solid #999;}
   .toolbar > li > i.pic {background-image: url("./images/toolbar/picture.png");}
   .toolbar > li > i.file {opacity:0.6;background-image: url("./images/toolbar/addfile.png");}
@@ -64,6 +65,9 @@
   .filebox > li.fileupload > div > span {display:block;position:absolute;top:50px;width:150px;overflow:hidden;text-overflow:ellipsis;}
   .filebox > .delete::after {content:"";position:absolute;top:0px;right:0px;width:10px;height:10px;background-image: url("./images/toolbar/del.png");background-size:100%;background-position:center;background-repeat:no-repeat;}
 
+  /* 其他 */
+  .messagetoico::after {content:"▸";color:#000;}
+
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
     .accordionPart > section.open {width:100%;float:left;}
@@ -73,14 +77,14 @@
 <script type="text/javascript" src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
 <!-- masonry -->
 <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
-<!-- ckeditor -->
-<script type="text/javascript" src="./include/ckeditor/ckeditor.js"></script>
 <!-- Loading套件 -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/extras/loadingoverlay_progress/loadingoverlay_progress.min.js"></script>
 <!-- Zoom -->
 <!-- <script type="text/javascript" src="./include/libsrc/jquery.elevatezoom.js"></script> -->
 <script>
+  var oUplod = {};
+
   $(function() {
 		$.LoadingOverlay("show");
 
@@ -92,40 +96,13 @@
           edit_text: $('#edit_text').val()
         },
         error: function() {
-          alert('無法下載, 請稍後嘗試!');
         },
         success: function(response) {
         }
       });
     });
 
-    $('.filebox > li').click(function (e) {
-      var sX = $(this).position().left;
-      var sY = $(this).position().top;
-      if (158 <= (e.pageX - sX) && 250 <= (e.pageY - sY)) {
-        // delete
-      }
-    });
-
 		$(document).ready(function() {
-			// Picture Zoom
-			// $('.imgupload > img').elevateZoom({scrollZoom: true, tint:false, tintColour:'#F90', tintOpacity:0.5});
-
-			// Vue.component('todo-item', {
-			//   props: ['todo'],
-			//   template: '<li>{{ todo.text }}</li>'
-			// })
-			// var app7 = new Vue({
-			//   el: '#app-7',
-			//   data: {
-			//     groceryList: [
-			//       {id: 0, text: '' },
-			//       {id: 1, text: '奶酪' },
-			//       {id: 2, text: '随便其他什么人吃的东西' }
-			//     ]
-			//   }
-			// })
-
 			// masonry
 			var $grid = $('.grid').masonry({
 			  itemSelector: '.grid-item',
@@ -151,6 +128,47 @@
 			  // set flag
 			  isStamped = !isStamped;
 			});
+
+      // 新增 圖片/檔案
+      $('.toolbar > li > i > input').click(function (e) {
+        oUplod = e.target;
+      });
+
+      $("body").on("change", ".toolbar > li > i > input", function (e) {
+        if (this.files && this.files[0]) {
+          oUplod.filename = this.files[0].name;
+          console.log(oUplod.filename);
+          var reader = new FileReader();
+            reader.onload = function (e) {
+
+              switch(oUplod.id) {
+                case 'uplodeimg':
+                  $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
+                  break;
+                case 'uplodefile':
+                  $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
+                  break;
+              }
+              // var KB = format_float(e.total / 1024, 2);
+            }
+            reader.readAsDataURL(this.files[0]);
+        }
+      })
+
+      // 刪除 圖片/檔案
+      $('.filebox > li').click(function (e) {
+        var sX = $(this).position().left;
+        var sY = $(this).position().top;
+        console.log(e.target, (e.pageX - sX), (e.pageY - sY));
+        if (158 <= (e.pageX - sX) && 250 <= (e.pageY - sY)) {
+          e.target.remove();
+          if (0 === $('.filebox').children().length) {
+            $('.filebox').height('0px');
+            $grid.masonry('reloadItems');
+            $grid.masonry('layout');
+          }
+        }
+      });
 
       // textarea 自動高
       $("textarea.auto-height").css("overflow", "hidden").bind("keydown keyup", function() {
@@ -194,7 +212,7 @@
           <div class="accordionPart grid">
 						<section class="stamp">
               <ul class="toolbar">
-                <li>TO:</li>
+                <li>留言<span class="messagetoico"></span></li>
                 <li class="messageto">
                   <select>
                     <option value="">全部家長</option>
@@ -202,8 +220,8 @@
                     <option value="">小美家長</option>
                   <select>
                 </li>
-                <li><i class="pic" alt="上傳圖片"></i></li>
-                <li><i class="file"></i></li>
+                <li><i class="pic" title="上傳圖片"><input id="uplodeimg" accept="image/*" type="file" value="" /></i></li>
+                <li><i class="file" title="上傳檔案"><input id="uplodefile" type="file" value="" /></i></li>
               </ul>
 							<textarea id="edit_text" name="edit_text" class="auto-height"></textarea>
               <ul class="filebox">
@@ -216,11 +234,17 @@
                 </li>
               </ul>
 							<button id="editor_btn" name="editor_btn" class="btn04" style="float:right;margin:0px;">確認</button>
+              <form style="display:none;">
+                <input id="hiuploadImage" accept="image/*" type="file">
+                <input id="hiuplodefile" accept="application/msword, application/vnd.ms-excel, application/vnd.ms-powerpoint, .pdf, text/plain" type="file">
+              </form>
 						</section>
 						<section class="grid-item">
 							<div class="qa_title">
 								<ul>
-									<li><span class="name">數學老師</span><span class="time">2017-10-23 14:00</span></li>
+									<li>
+                    <span class="name">我<span class="messagetoico"></span>小明家長</span><span class="time">2017-10-23 14:00</span>
+                  </li>
 									<li>
                     <span class="text">
 										老師覺得你接受知識的能力還是挺好的。可是你有時候管不住自己，課上總愛做小動作。字嘛，有些馬虎，這種學習態度可要不得呀！老師相信你一定會改掉的，是嗎？利用假期好好練字哦！
@@ -260,7 +284,7 @@
 						<section class="grid-item">
 							<div class="qa_title">
 								<ul>
-									<li><span class="name">校長</span><span class="time">2017-10-23 14:00</span></li>
+									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
 									<li>
                     <span class="text">
 										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
@@ -283,7 +307,7 @@
 							<div class="qa_content">
 								<ul>
 									<li>
-										<span class="name">王先生</span>
+										<span class="name">6年9班老師</span>
 										<span class="text">感謝老師教導有方</span>
 										<span class="time">2017-10-25 09:06</span>
 									</li>
@@ -299,7 +323,7 @@
 						<section class="grid-item">
 							<div class="qa_title">
 								<ul>
-									<li><span class="name">實驗6年9班老師</span><span class="time">2017-10-23 14:00</span></li>
+									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
 									<li><span class="text">學期成績</span></li>
 									<li>
                     <img class="qaimg" src="./include/srcoe.jpg" />
@@ -336,7 +360,7 @@
             <section class="grid-item">
 							<div class="qa_title">
 								<ul>
-									<li><span class="name">校長</span><span class="time">2017-10-23 14:00</span></li>
+									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
 									<li>
                     <span class="text">
 										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
@@ -375,7 +399,7 @@
             <section class="grid-item">
 							<div class="qa_title">
 								<ul>
-									<li><span class="name">校長</span><span class="time">2017-10-23 14:00</span></li>
+									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
 									<li>
                     <span class="text">
 										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
