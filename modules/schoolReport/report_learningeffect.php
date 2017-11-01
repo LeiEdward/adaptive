@@ -7,8 +7,15 @@
     session_start();
   }
 
+  $vUertACL = array('41', '51');
+
   // 取得 user 資料
   $vUserData = get_object_vars($_SESSION['user_data']);
+
+  if (false === array_search($vUserData['uid'], $vUertACL)) {
+    echo '無權限瀏覽';
+    return;
+  }
 
   // 統一接變數
   $vCond = array();
