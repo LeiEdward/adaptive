@@ -12,10 +12,10 @@
   // 取得 user 資料
   $vUserData = get_object_vars($_SESSION['user_data']);
 
-  // if (false === array_search($vUserData['uid'], $vUertACL)) {
-  //   echo '無權限瀏覽';
-  //   return;
-  // }
+  if (false === array_search($vUserData['access_level'], $vUertACL)) {
+    echo '無權限瀏覽';
+    return;
+  }
 
   // 統一接變數
   $vCond = array();
@@ -290,15 +290,6 @@
     $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
 
     return $vReportData;
-  }
-
-  function sub_name($sub) {
-  	global $dbh;
-
-  	$sql = "SELECT map_name FROM `map_info` where subject_id='$sub' AND display=1";
-  	$data = $dbh->query($sql);
-  	$row = $data->fetch();
-  	return $row['map_name'];
   }
 ?>
 <!DOCTYPE HTML>

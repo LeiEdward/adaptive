@@ -8,7 +8,7 @@ $sSemeYear = getYearSeme();
 createReport_dailyusage($sSemeYear);
 
 function createReport_dailyusage($sSemeYear) {
-  global $dbh;
+  global $dbh, $ref_cityarea;
 
    $oReport = $dbh->prepare("SELECT organization_id FROM report_dailyusage WHERE datetime_log LIKE '".date('Y-m-d')."%'") ;
    $oReport->execute();
@@ -207,4 +207,13 @@ function getLearningStat($vReportData, $sSemeYear) {
     }
 	}
   return $vReportData;
+}
+
+function sub_name($sub) {
+  global $dbh;
+
+  $sql = "SELECT map_name FROM `map_info` where subject_id='$sub' AND display=1";
+  $data = $dbh->query($sql);
+  $row = $data->fetch();
+  return $row['map_name'];
 }
