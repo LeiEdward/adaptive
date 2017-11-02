@@ -68,6 +68,7 @@
   /* 其他 */
   .messagetoico::after {content:"▸";color:#000;}
 
+  /* RWD */
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
     .accordionPart > section.open {width:100%;float:left;}
@@ -84,9 +85,11 @@
 <!-- <script type="text/javascript" src="./include/libsrc/jquery.elevatezoom.js"></script> -->
 <script>
   var oUplod = {};
+  var iFileSizeLimit = 3072000; // 3M (1M = 1024000)
+  var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt'];
 
   $(function() {
-		$.LoadingOverlay("show");
+		$.LoadingOverlay('show');
 
     $('#editor_btn').click(function() {
       $.ajax({
@@ -134,34 +137,45 @@
         oUplod = e.target;
       });
 
-      $("body").on("change", ".toolbar > li > i > input", function (e) {
+      $('body').on('change', '.toolbar > li > i > input', function (e) {
         if (this.files && this.files[0]) {
           oUplod.filename = this.files[0].name;
           oUplod.filetype = this.files[0].type;
+          oUplod.filesize = this.files[0].size;
+          console.log(this.files[0]);
+          if (iFileSizeLimit < oUplod.filesize) {
+            alert('您的檔案過大，檔案大小限制為3M');
+            return;
+          }
+          if (1 < oUplod.filename.split('.').length-1) {
+            alert('您的檔案名稱不能含有特殊字元 .');
+            return;
+          }
+          if (-1 == $.inArray(oUplod.filename.split('.').pop(), vPassType)) {
+            alert('不接受此格式檔案!');
+            return;
+          }
 
           var reader = new FileReader();
-            reader.onload = function (e) {
-              $('.filebox').height('150px');
-
-              if (0 <= oUplod.filetype.indexOf('image')) {
-                $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
-              }
-              else {
-                $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
-              }
-              $grid.masonry('reloadItems');
-              $grid.masonry('layout');
-              // var KB = format_float(e.total / 1024, 2);
+          reader.onload = function (e) {
+            $('.filebox').height('150px');
+            if (0 <= oUplod.filetype.indexOf('image')) {
+              $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
             }
-            reader.readAsDataURL(this.files[0]);
+            else {
+              $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
+            }
+            $grid.masonry('reloadItems');
+            $grid.masonry('layout');
+          }
+          reader.readAsDataURL(this.files[0]);
         }
       })
 
       // 刪除 圖片/檔案
-      $("body").on("click", ".filebox > li", function (e) {
+      $('body').on('click', '.filebox > li', function (e) {
         var sX = $(this).position().left;
         var sY = $(this).position().top;
-        console.log(e.target, (e.pageX - sX), (e.pageY - sY));
         if (158 <= (e.pageX - sX) && 250 <= (e.pageY - sY) && $(e.target).is('li')) {
           e.target.remove();
 
@@ -175,8 +189,8 @@
       });
 
       // textarea 自動高
-      $("textarea.auto-height").css("overflow", "hidden").bind("keydown keyup", function() {
-          $(this).height('0px').height($(this).prop("scrollHeight") + 'px');
+      $('textarea.auto-height').css('overflow', 'hidden').bind('keydown keyup', function() {
+          $(this).height('0px').height($(this).prop('scrollHeight') + 'px');
           $('#stamp').height($(this).height());
           $grid.masonry('reloadItems');
           $grid.masonry('layout');
@@ -198,7 +212,7 @@
 			});
 
 			$grid.masonry();
-      $.LoadingOverlay("hide");
+      $.LoadingOverlay('hide');
   });
 });
 </script>
