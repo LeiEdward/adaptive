@@ -12,10 +12,10 @@
   // 取得 user 資料
   $vUserData = get_object_vars($_SESSION['user_data']);
 
-  if (false === array_search($vUserData['uid'], $vUertACL)) {
-    echo '無權限瀏覽';
-    return;
-  }
+  // if (false === array_search($vUserData['uid'], $vUertACL)) {
+  //   echo '無權限瀏覽';
+  //   return;
+  // }
 
   // 統一接變數
   $vCond = array();
@@ -254,8 +254,10 @@ function getUserACL() {
       }
     }
   }
-  ksort($vGrade);
-  ksort($vSubject);
+  if (!empty($vGrade) && !empty($vSubject)) {
+    ksort($vGrade);
+    ksort($vSubject);
+  }
 }
 
 function getSelector($vCityData, $vGrade, $vSubject) {
@@ -410,10 +412,10 @@ function make_excel($vReportData) {
       // $('#select_city').val(oUserSelect.city);
       // $('#select_area').val(oUserSelect.area);
       // $('#select_school').val(oUserSelect.school);
-      $('#select_subject').val(oUserSelect.subject);
-      $('#select_grade').val(oUserSelect.grade);
-      $('#hiSubject').val(oUserSelect.subject);
-      $('#hiGrade').val(oUserSelect.grade);
+      // $('#select_subject').val(oUserSelect.subject);
+      // $('#select_grade').val(oUserSelect.grade);
+      // $('#hiSubject').val(oUserSelect.subject);
+      // $('#hiGrade').val(oUserSelect.grade);
       $.LoadingOverlay("hide");
     });
 

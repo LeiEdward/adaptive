@@ -137,18 +137,20 @@
       $("body").on("change", ".toolbar > li > i > input", function (e) {
         if (this.files && this.files[0]) {
           oUplod.filename = this.files[0].name;
-          console.log(oUplod.filename);
+          oUplod.filetype = this.files[0].type;
+
           var reader = new FileReader();
             reader.onload = function (e) {
+              $('.filebox').height('150px');
 
-              switch(oUplod.id) {
-                case 'uplodeimg':
-                  $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
-                  break;
-                case 'uplodefile':
-                  $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
-                  break;
+              if (0 <= oUplod.filetype.indexOf('image')) {
+                $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
               }
+              else {
+                $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
+              }
+              $grid.masonry('reloadItems');
+              $grid.masonry('layout');
               // var KB = format_float(e.total / 1024, 2);
             }
             reader.readAsDataURL(this.files[0]);
@@ -156,12 +158,14 @@
       })
 
       // 刪除 圖片/檔案
-      $('.filebox > li').click(function (e) {
+      $("body").on("click", ".filebox > li", function (e) {
         var sX = $(this).position().left;
         var sY = $(this).position().top;
         console.log(e.target, (e.pageX - sX), (e.pageY - sY));
-        if (158 <= (e.pageX - sX) && 250 <= (e.pageY - sY)) {
+        if (158 <= (e.pageX - sX) && 250 <= (e.pageY - sY) && $(e.target).is('li')) {
           e.target.remove();
+
+          // 如果沒有檔案, 畫面縮小
           if (0 === $('.filebox').children().length) {
             $('.filebox').height('0px');
             $grid.masonry('reloadItems');
@@ -220,8 +224,8 @@
                     <option value="">小美家長</option>
                   <select>
                 </li>
-                <li><i class="pic" title="上傳圖片"><input id="uplodeimg" accept="image/*" type="file" value="" /></i></li>
-                <li><i class="file" title="上傳檔案"><input id="uplodefile" type="file" value="" /></i></li>
+                <!-- <li><i class="pic" title="上傳圖片"><input id="uplodeimg" accept="image/*" type="file" value="" /></i></li> -->
+                <li><i class="file" title="上傳圖片/檔案"><input id="uplodefile" type="file" value="" /></i></li>
               </ul>
 							<textarea id="edit_text" name="edit_text" class="auto-height"></textarea>
               <ul class="filebox">
@@ -235,8 +239,7 @@
               </ul>
 							<button id="editor_btn" name="editor_btn" class="btn04" style="float:right;margin:0px;">確認</button>
               <form style="display:none;">
-                <input id="hiuploadImage" accept="image/*" type="file">
-                <input id="hiuplodefile" accept="application/msword, application/vnd.ms-excel, application/vnd.ms-powerpoint, .pdf, text/plain" type="file">
+                <input id="hiuplodefile" accept="" type="file">
               </form>
 						</section>
 						<section class="grid-item">
