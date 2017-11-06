@@ -90,17 +90,24 @@
   $(function() {
 		$.LoadingOverlay('show');
 
-    $('#editor_btn').click(function() {
+    $('#sumbit_btn').click(function() {
+      var fileupload = $('#uplodefile').prop('files')[0];
+      var form_data = new FormData();
+      form_data.append('import_file', fileupload);
+      // console.log(fileupload, form_data);
+
       $.ajax({
-        url: 'modules.php?op=modload&name=message&file=uploadfile',
-        type: 'POST',
-        data: {
-          edit_text: $('#edit_text').val()
-        },
-        error: function() {
-        },
-        success: function(response) {
-        }
+          url: "./modules/message/uploadfile.php",
+          method: "POST",
+          data: form_data,
+          processData: false,
+          contentType: false,
+          success: function (response) {
+              console.log(111,response);
+          },
+          error: function (jqXHR, textStatus, errorMessage) {
+              console.log(errorMessage);
+          }
       });
     });
 
@@ -141,7 +148,7 @@
           oUplod.filename = this.files[0].name;
           oUplod.filetype = this.files[0].type;
           oUplod.filesize = this.files[0].size;
-          console.log(this.files[0]);
+
           if (iFileSizeLimit < oUplod.filesize) {
             alert('您的檔案過大，檔案大小限制為3M');
             return;
@@ -250,10 +257,7 @@
                   </div>
                 </li>
               </ul>
-							<button id="editor_btn" name="editor_btn" class="btn04" style="float:right;margin:0px;">確認</button>
-              <form style="display:none;">
-                <input id="hiuplodefile" accept="" type="file">
-              </form>
+							<button id="sumbit_btn" name="sumbit_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
 						<section class="grid-item">
 							<div class="qa_title">
