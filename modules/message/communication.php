@@ -68,6 +68,7 @@
   /* 其他 */
   .messagetoico::after {content:"▸";color:#000;}
 
+  /* RWD */
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
     .accordionPart > section.open {width:100%;float:left;}
@@ -162,6 +163,20 @@
             return;
           }
 
+          console.log(this.files[0]);
+          if (iFileSizeLimit < oUplod.filesize) {
+            alert('您的檔案過大，檔案大小限制為3M');
+            return;
+          }
+          if (1 < oUplod.filename.split('.').length-1) {
+            alert('您的檔案名稱不能含有特殊字元 .');
+            return;
+          }
+          if (-1 == $.inArray(oUplod.filename.split('.').pop(), vPassType)) {
+            alert('不接受此格式檔案!');
+            return;
+          }
+
           var reader = new FileReader();
           reader.onload = function (e) {
             $('.filebox').height('150px');
@@ -171,6 +186,10 @@
             else {
               $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
             }
+          }
+          else {
+            $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
+          }
             $grid.masonry('reloadItems');
             $grid.masonry('layout');
           }
