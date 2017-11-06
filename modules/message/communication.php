@@ -68,6 +68,7 @@
   /* 其他 */
   .messagetoico::after {content:"▸";color:#000;}
 
+  /* RWD */
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
     .accordionPart > section.open {width:100%;float:left;}
@@ -89,12 +90,15 @@
 
   $(function() {
 		$.LoadingOverlay('show');
+<<<<<<< HEAD
 
     $('#sumbit_btn').click(function() {
       var fileupload = $('#uplodefile').prop('files')[0];
       var form_data = new FormData();
       form_data.append('import_file', fileupload);
       // console.log(fileupload, form_data);
+=======
+>>>>>>> master
 
       $.ajax({
           url: "./modules/message/uploadfile.php",
@@ -148,6 +152,7 @@
           oUplod.filename = this.files[0].name;
           oUplod.filetype = this.files[0].type;
           oUplod.filesize = this.files[0].size;
+<<<<<<< HEAD
 
           if (iFileSizeLimit < oUplod.filesize) {
             alert('您的檔案過大，檔案大小限制為3M');
@@ -162,15 +167,38 @@
             return;
           }
 
+=======
+          console.log(this.files[0]);
+          if (iFileSizeLimit < oUplod.filesize) {
+            alert('您的檔案過大，檔案大小限制為3M');
+            return;
+          }
+          if (1 < oUplod.filename.split('.').length-1) {
+            alert('您的檔案名稱不能含有特殊字元 .');
+            return;
+          }
+          if (-1 == $.inArray(oUplod.filename.split('.').pop(), vPassType)) {
+            alert('不接受此格式檔案!');
+            return;
+          }
+
+>>>>>>> master
           var reader = new FileReader();
           reader.onload = function (e) {
             $('.filebox').height('150px');
             if (0 <= oUplod.filetype.indexOf('image')) {
               $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
+<<<<<<< HEAD
             }
             else {
               $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
             }
+=======
+            }
+            else {
+              $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
+            }
+>>>>>>> master
             $grid.masonry('reloadItems');
             $grid.masonry('layout');
           }
