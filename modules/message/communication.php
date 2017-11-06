@@ -1,6 +1,11 @@
 <?php
+  require_once('./include/config.php');
+  require_once('./include/adp_API.php');
 
 
+  // $oReprot = $dbh->prepare();
+  // $oReprot->execute();
+  // $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE HTML>
 <html>
@@ -58,7 +63,7 @@
   .toolbar > li.messageto > select {height:28px;margin-top:5px;}
 
   /* 留言上傳檔案 */
-  .filebox {display:block;overflow:hidden;overflow-x:auto;white-space:nowrap;height:150px;height:110px;}
+  .filebox {display:block;overflow:hidden;overflow-x:auto;white-space:nowrap;}
   .filebox > li {position:relative;display:inline-block;vertical-align:top;width:150px;margin-right:4px;cursor:pointer;}
   .filebox > li.fileupload > div {position:relative;}
   .filebox > li.fileupload > div > img {position:absolute;top:36px;left:45px;opacity: 0.2;}
@@ -67,6 +72,8 @@
 
   /* 其他 */
   .messagetoico::after {content:"▸";color:#000;}
+  .bd1 {border:1px solid rgb(164, 164, 164);}
+  .h125 {height:125px;}
 
   /* RWD */
   @media screen and (min-width: 500px) {
@@ -81,24 +88,16 @@
 <!-- Loading套件 -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/extras/loadingoverlay_progress/loadingoverlay_progress.min.js"></script>
-<!-- Zoom -->
-<!-- <script type="text/javascript" src="./include/libsrc/jquery.elevatezoom.js"></script> -->
 <script>
   var oUplod = {};
   var iFileSizeLimit = 3072000; // 3M (1M = 1024000)
-  var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt'];
 
   $(function() {
 		$.LoadingOverlay('show');
-<<<<<<< HEAD
-
     $('#sumbit_btn').click(function() {
       var fileupload = $('#uplodefile').prop('files')[0];
       var form_data = new FormData();
       form_data.append('import_file', fileupload);
-      // console.log(fileupload, form_data);
-=======
->>>>>>> master
 
       $.ajax({
           url: "./modules/message/uploadfile.php",
@@ -106,11 +105,16 @@
           data: form_data,
           processData: false,
           contentType: false,
-          success: function (response) {
-              console.log(111,response);
+          success: function (sRtn) {
+            var oRtn = JSON.parse(sRtn);
+            if ('SUCCESS' === oRtn.STATUS) {
+            }
+            else {
+              alert('上傳失敗!' + ' ' + oRtn.MSG);
+            }
           },
           error: function (jqXHR, textStatus, errorMessage) {
-              console.log(errorMessage);
+              alert('伺服器連線不穩定，請稍後再試!')
           }
       });
     });
@@ -148,62 +152,40 @@
       });
 
       $('body').on('change', '.toolbar > li > i > input', function (e) {
-        if (this.files && this.files[0]) {
-          oUplod.filename = this.files[0].name;
-          oUplod.filetype = this.files[0].type;
-          oUplod.filesize = this.files[0].size;
-<<<<<<< HEAD
+        if (!this.files && !this.files[0]) return;
 
-          if (iFileSizeLimit < oUplod.filesize) {
-            alert('您的檔案過大，檔案大小限制為3M');
-            return;
-          }
-          if (1 < oUplod.filename.split('.').length-1) {
-            alert('您的檔案名稱不能含有特殊字元 .');
-            return;
-          }
-          if (-1 == $.inArray(oUplod.filename.split('.').pop(), vPassType)) {
-            alert('不接受此格式檔案!');
-            return;
-          }
+        var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt','pdf'];
 
-=======
-          console.log(this.files[0]);
-          if (iFileSizeLimit < oUplod.filesize) {
-            alert('您的檔案過大，檔案大小限制為3M');
-            return;
-          }
-          if (1 < oUplod.filename.split('.').length-1) {
-            alert('您的檔案名稱不能含有特殊字元 .');
-            return;
-          }
-          if (-1 == $.inArray(oUplod.filename.split('.').pop(), vPassType)) {
-            alert('不接受此格式檔案!');
-            return;
-          }
+        oUplod.filename = this.files[0].name;
+        oUplod.filetype = this.files[0].type;
+        oUplod.filesize = this.files[0].size;
 
->>>>>>> master
-          var reader = new FileReader();
-          reader.onload = function (e) {
-            $('.filebox').height('150px');
-            if (0 <= oUplod.filetype.indexOf('image')) {
-              $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
-<<<<<<< HEAD
-            }
-            else {
-              $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
-            }
-=======
-            }
-            else {
-              $('.filebox').append('<li class="fileupload delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
-            }
->>>>>>> master
-            $grid.masonry('reloadItems');
-            $grid.masonry('layout');
-          }
-          reader.readAsDataURL(this.files[0]);
+        if (iFileSizeLimit < oUplod.filesize) {
+          alert('您的檔案過大，檔案大小限制為3M');
+          return;
         }
+        if (1 < oUplod.filename.split('.').length-1) {
+          alert('您的檔案名稱不能含有特殊字元 .');
+          return;
+        }
+        if (-1 == $.inArray(oUplod.filename.split('.').pop(), vPassType)) {
+          alert('不接受此格式檔案!');
+          return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          $('.filebox').height('150px');
+          if (0 <= oUplod.filetype.indexOf('image')) {
+            $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
+          }
+          else {
+            $('.filebox').append('<li class="fileupload bd1 h125 delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
+          }
+          $grid.masonry('reloadItems');
+          $grid.masonry('layout');
+        }
+        reader.readAsDataURL(this.files[0]);
       })
 
       // 刪除 圖片/檔案
@@ -277,13 +259,13 @@
               </ul>
 							<textarea id="edit_text" name="edit_text" class="auto-height"></textarea>
               <ul class="filebox">
-                <li class="imgupload delete"><img src="./include/srcoe.jpg" /></li>
+                <!-- <li class="imgupload delete"><img src="./include/srcoe.jpg" /></li>
                 <li class="fileupload delete">
                   <div>
                     <img src="./images/toolbar/file.png" />
                     <span>10月期中考.xsl</span>
                   </div>
-                </li>
+                </li> -->
               </ul>
 							<button id="sumbit_btn" name="sumbit_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
