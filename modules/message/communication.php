@@ -2,10 +2,26 @@
   require_once('./include/config.php');
   require_once('./include/adp_API.php');
 
+  if (!isset($_SESSION)) {
+  	session_start();
+  }
+  $sUserID = $_SESSION['user_id'];
+  $sSQLMessage = "SELECT msg_sn, create_time, create_user, touser_id, msg_content, attachefile, delete_falg
+    FROM message_master WHERE delete_falg = '0' AND (touser_id = '$sUserID' OR create_user ='$sUserID')";
+  $oMessage = $dbh->prepare($sSQLMessage);
+  $oMessage->execute();
+  $vMessageData = $oMessage->fetchAll(\PDO::FETCH_ASSOC);
 
-  // $oReprot = $dbh->prepare();
-  // $oReprot->execute();
-  // $vReportData = $oReprot->fetchAll(\PDO::FETCH_ASSOC);
+  $vMessageData = handleData($vMessageData);
+
+  // 整理資料, 統一變數傳至HTML
+  $sJSOject = arraytoJS(array('Message' => $vMessageData));
+
+  function handleData($vMessageData) {
+
+
+    return $vMessageData;
+  }
 ?>
 <!DOCTYPE HTML>
 <html>
@@ -81,45 +97,29 @@
     .accordionPart > section.open {width:100%;float:left;}
   }
 </style>
-<script type="text/javascript" src="https://unpkg.com/vue"></script>
-<script type="text/javascript" src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.1/vue.js"></script>
 <!-- masonry -->
 <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
 <!-- Loading套件 -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/extras/loadingoverlay_progress/loadingoverlay_progress.min.js"></script>
 <script>
-  var oUplod = {};
   var iFileSizeLimit = 3072000; // 3M (1M = 1024000)
+  var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
 
   $(function() {
 		$.LoadingOverlay('show');
     $('#sumbit_btn').click(function() {
-      var fileupload = $('#uplodefile').prop('files')[0];
-      var form_data = new FormData();
-      form_data.append('import_file', fileupload);
 
-      $.ajax({
-          url: "./modules/message/uploadfile.php",
-          method: "POST",
-          data: form_data,
-          processData: false,
-          contentType: false,
-          success: function (sRtn) {
-            var oRtn = JSON.parse(sRtn);
-            if ('SUCCESS' === oRtn.STATUS) {
-            }
-            else {
-              alert('上傳失敗!' + ' ' + oRtn.MSG);
-            }
-          },
-          error: function (jqXHR, textStatus, errorMessage) {
-              alert('伺服器連線不穩定，請稍後再試!')
-          }
-      });
     });
 
 		$(document).ready(function() {
+      // Vue
+      var vueMessage = new Vue({
+        el: '#msg_content',
+        data: oItem
+      })
+
 			// masonry
 			var $grid = $('.grid').masonry({
 			  itemSelector: '.grid-item',
@@ -146,53 +146,70 @@
 			  isStamped = !isStamped;
 			});
 
-      // 新增 圖片/檔案
-      $('.toolbar > li > i > input').click(function (e) {
-        oUplod = e.target;
-      });
-
+      // 新增 檔案
       $('body').on('change', '.toolbar > li > i > input', function (e) {
-        if (!this.files && !this.files[0]) return;
+        if (typeof this.files[0] === 'undefined') return;
 
         var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt','pdf'];
+        var filename = this.files[0].name;
+        var filetype = this.files[0].type;
+        var filesize = this.files[0].size;
 
-        oUplod.filename = this.files[0].name;
-        oUplod.filetype = this.files[0].type;
-        oUplod.filesize = this.files[0].size;
-
-        if (iFileSizeLimit < oUplod.filesize) {
+        if (iFileSizeLimit < filesize) {
           alert('您的檔案過大，檔案大小限制為3M');
           return;
         }
-        if (1 < oUplod.filename.split('.').length-1) {
+        if (1 < filename.split('.').length-1) {
           alert('您的檔案名稱不能含有特殊字元 .');
           return;
         }
-        if (-1 == $.inArray(oUplod.filename.split('.').pop(), vPassType)) {
+        if (-1 == $.inArray(filename.split('.').pop(), vPassType)) {
           alert('不接受此格式檔案!');
           return;
         }
+        var fileupload = $('#uplodefile').prop('files')[0];
+        var form_data = new FormData();
+        form_data.append('import_file', fileupload);
 
-        var reader = new FileReader();
-        reader.onload = function (e) {
-          $('.filebox').height('150px');
-          if (0 <= oUplod.filetype.indexOf('image')) {
-            $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
-          }
-          else {
-            $('.filebox').append('<li class="fileupload bd1 h125 delete"><div><img src="./images/toolbar/file.png" /><span>' + oUplod.filename + '</span></div></li>');
-          }
-          $grid.masonry('reloadItems');
-          $grid.masonry('layout');
-        }
-        reader.readAsDataURL(this.files[0]);
+        $.ajax({
+            url: './modules/message/checkfile.php',
+            data: form_data,
+            method: "POST",
+            processData: false,
+            contentType: false,
+            success: function (sRtn) {
+              // console.log(sRtn);
+              var oRtn = JSON.parse(sRtn);
+              if ('SUCCESS' === oRtn.STATUS) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                  $('.filebox').height('150px');
+                  if (0 <= filetype.indexOf('image')) {
+                    $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
+                  }
+                  else {
+                    $('.filebox').append('<li class="fileupload bd1 h125 delete"><div><img src="./images/toolbar/file.png" /><span>' + filename + '</span></div></li>');
+                  }
+                  $grid.masonry('reloadItems');
+                  $grid.masonry('layout');
+                }
+                reader.readAsDataURL(fileupload);
+              }
+              else {
+                alert('檔案上傳失敗' + ' ' + oRtn.MSG);
+              }
+            },
+            error: function (jqXHR, textStatus, errorMessage) {
+                alert('伺服器連線不穩定，請稍後再試!')
+            }
+        });
       })
 
       // 刪除 圖片/檔案
       $('body').on('click', '.filebox > li', function (e) {
         var sX = $(this).position().left;
         var sY = $(this).position().top;
-        if (158 <= (e.pageX - sX) && 250 <= (e.pageY - sY) && $(e.target).is('li')) {
+        if (196 <= (e.pageX - sX) && 306 >= (e.pageY - sY) && $(e.target).is('li')) {
           e.target.remove();
 
           // 如果沒有檔案, 畫面縮小
@@ -231,6 +248,7 @@
       $.LoadingOverlay('hide');
   });
 });
+
 </script>
   <div class="content2-Box">
 	  <div class="path">目前位置：親師互動</div>
@@ -254,63 +272,37 @@
                     <option value="">小美家長</option>
                   <select>
                 </li>
-                <!-- <li><i class="pic" title="上傳圖片"><input id="uplodeimg" accept="image/*" type="file" value="" /></i></li> -->
                 <li><i class="file" title="上傳圖片/檔案"><input id="uplodefile" type="file" value="" /></i></li>
               </ul>
 							<textarea id="edit_text" name="edit_text" class="auto-height"></textarea>
-              <ul class="filebox">
-                <!-- <li class="imgupload delete"><img src="./include/srcoe.jpg" /></li>
-                <li class="fileupload delete">
-                  <div>
-                    <img src="./images/toolbar/file.png" />
-                    <span>10月期中考.xsl</span>
-                  </div>
-                </li> -->
-              </ul>
+              <ul class="filebox"></ul>
 							<button id="sumbit_btn" name="sumbit_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
-						<section class="grid-item">
-							<div class="qa_title">
-								<ul>
-									<li>
-                    <span class="name">我<span class="messagetoico"></span>小明家長</span><span class="time">2017-10-23 14:00</span>
-                  </li>
-									<li>
-                    <span class="text">
-										老師覺得你接受知識的能力還是挺好的。可是你有時候管不住自己，課上總愛做小動作。字嘛，有些馬虎，這種學習態度可要不得呀！老師相信你一定會改掉的，是嗎？利用假期好好練字哦！
-										你平時不愛秀出自己，習慣了默默無聞，但對班級卻很關心。不過，你的字卻讓老師感到頭疼，每次都要「猜猜猜」，希望你能充分認識到這一點，把字寫得端端正正。
-										真誠地希望你能在學習上激活所有的腦細胞，我們一起努力，你準備好了嗎？
-                    </span>
-									</li>
-                  <li>
-                    <span class="attachedfile">
-                      <i class="ico"></i>
-                      <span class="filename">
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                        <span>filenanme</span>
+            <div id="msg_content">
+              <section v-for="item in Message" class="grid-item">
+                <!-- {{item}} -->
+                <div class="qa_title">
+  								<ul>
+  									<li><span class="name">{{item.create_user}}<span class="messagetoico"></span>{{item.touser_id}}</span><span class="time">2017-10-23 14:00</span></li>
+  									<li>
+                      <span class="text">{{item.msg_content}}</span>
+  									</li>
+  									<li>
+                      <span class="attachedfile" v-if="!item.attachedfile" >
+                        <i class="ico"></i>
+                        <span class="filename">
+                          <span>filenanme</span>
+                          <span>filenanme</span>
+                          <span>filenanme</span>
+                        </span>
+                        <span class="info">留言數(2)</span>
                       </span>
-                      <span class="info">留言數(2)</span>
-                    </span>
-                  </li>
-								</ul>
-							</div>
-							<div class="qa_content">
-								<ul>
-									<li>
-										<span class="name">王先生</span>
-										<span class="text">感謝老師教導有方</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-									<li>
-										<span class="name">實驗6年9班老師</span>
-										<span class="text">是學生自己用功的</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-								</ul>
-								<div><input type="text" placeholder="留言‧‧‧‧‧" /></div>
-							</div>
-						</section>
+                    </li>
+  								</ul>
+  							</div>
+  						</section>
+            </div>
+
 						<section class="grid-item">
 							<div class="qa_title">
 								<ul>

@@ -1,11 +1,12 @@
 <?php
-  $vRtn = array();
-  if (!isset($_FILES['import_file']['tmp_name'])) {
-    $vRtn['STATUS'] = 'ERR';
-    $vRtn['MSG'] = '錯誤代碼: MD_MSG_UFx008';
-    echo json_encode($vRtn);
+  require_once('../../include/config.php');
+  require_once('../../include/adp_API.php');
+
+  if (!isset($_SESSION)) {
+  	session_start();
   }
 
+  $vRtn = array();
   $sFileType = $_FILES['import_file']['type'];
   switch($sFileType) {
     case 'application/vnd.openxmlformats-officedocument.presentationml.presentation': //pptx
@@ -20,24 +21,23 @@
     case 'image/png':
     case 'image/gif':
     case 'image/bmp':
-      $vRtn['STATUS'] = 'OK';
+      $vRtn['STATUS'] = 'SUCCESS';
       break;
 
     default:
       $vRtn['STATUS'] = 'ERR';
-      $vRtn['MSG'] = '錯誤代碼: MD_MSG_UFx031';
-
-      echo json_encode($vRtn);
+      $vRtn['MSG'] = '錯誤代碼: MD_MSG_UFx024';
       break;
   }
-  if ('ERR' === $vRtn['STATUS']) return;
 
-  if (move_uploaded_file($_FILES['import_file']['tmp_name'], '../../data/message/'.$_FILES['import_file']['name'])) {
-    $vRtn['STATUS'] = 'SUCCESS';
+  $sTimeSatmp = microtime(true);
+  $sFileName = $_SESSION['user_id'].'_'.str_replace('.', '_', $sTimeSatmp).'_'.$_FILES['import_file']['name'];
+  $_SESSION['message']['uploadfile'][] = $sFileName;
+  if ('SUCCESS' === $vRtn['STATUS'] && move_uploaded_file($_FILES['import_file']['tmp_name'], '../../tmp/'.$sFileName)) {
   }
   else {
     $vRtn['STATUS'] = 'ERR';
-    $vRtn['MSG'] = '錯誤代碼: MD_MSG_UFx041';
+    $vRtn['MSG'] = '請重新上傳，錯誤代碼: MD_MSG_UFx040';
   }
-  // print_r($vRtn);
+
   echo json_encode($vRtn);
