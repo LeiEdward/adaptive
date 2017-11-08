@@ -227,14 +227,6 @@
     return implode('', $vCitySelect);
   }
 
-  function arraytoJS($vData) {
-    $sJSOject = array();
-    if(!empty($vData) && is_array($vData)) {
-       $sJSOject = json_encode($vData);
-    }
-    return $sJSOject;
-  }
-
   function getReprotData($vData) {
     global $dbh, $vUserData;
 
