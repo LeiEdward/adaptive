@@ -6,8 +6,13 @@
   	session_start();
   }
   $sUserID = $_SESSION['user_id'];
-  $sSQLMessage = "SELECT msg_sn, create_time, create_user, touser_id, msg_content, attachefile, delete_falg
-    FROM message_master WHERE delete_falg = '0' AND (touser_id = '$sUserID' OR create_user ='$sUserID')";
+  $sSQLMessage = "SELECT * FROM message_master
+    LEFT JOIN message_response
+    ON message_master.msg_sn = message_response.message_sn
+    LEFT JOIN message_fileattached
+    ON message_master.msg_sn = message_fileattached.message_sn
+    WHERE message_master.delete_falg = '0' AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+    ORDER BY message_master.create_time DESC";
   $oMessage = $dbh->prepare($sSQLMessage);
   $oMessage->execute();
   $vMessageData = $oMessage->fetchAll(\PDO::FETCH_ASSOC);
@@ -15,11 +20,17 @@
   $vMessageData = handleData($vMessageData);
 
   // 整理資料, 統一變數傳至HTML
-  $sJSOject = arraytoJS(array('Message' => $vMessageData));
+  $sJSOject = arraytoJS(array('Userid' => $sUserID,
+                              'Message' => $vMessageData));
 
   function handleData($vMessageData) {
-
-
+    print_r($vMessageData);
+    foreach ($vMessageData as $key => $vMsg) {
+      $vMessageData[$key]['create_user'] = id2uname($vMsg['create_user']);
+      $vMessageData[$key]['touser_name'] = id2uname($vMsg['touser_id']);
+      $vMessageData[$key]['create_time'] = substr($vMsg['create_time'], 0, 16);
+      $vMessageData[$key]['msg_content'] = str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['msg_content']);
+    }
     return $vMessageData;
   }
 ?>
@@ -48,7 +59,7 @@
   .qa_title > ul > li {position:relative;overflow:hidden;}
   .qa_title > ul > li > .name {color:rgb(0, 0, 255);}
   .qa_title > ul > li > .time {padding:0px 4px;font-size:14px;}
-  .qa_title > ul > li > .text {padding-left:1em;}
+  /*.qa_title > ul > li > .text {padding-left:1em;}*/
   .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
   .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;}
   .qa_title > ul > li > .attachedfile > .ico {display:inline-block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;background-image: url("./images/toolbar/file.png");}
@@ -106,22 +117,15 @@
 <script>
   var iFileSizeLimit = 3072000; // 3M (1M = 1024000)
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
+  console.log(oItem);
 
   $(function() {
 		$.LoadingOverlay('show');
-    $('#sumbit_btn').click(function() {
-
-    });
 
 		$(document).ready(function() {
-      // Vue
-      var vueMessage = new Vue({
-        el: '#msg_content',
-        data: oItem
-      })
 
-			// masonry
-			var $grid = $('.grid').masonry({
+      // masonry
+      var $grid = $('.grid').masonry({
 			  itemSelector: '.grid-item',
 			  columnWidth: $('#grid-item').width(),
 				gutter: 5
@@ -144,7 +148,70 @@
 			  $grid.masonry('layout');
 			  // set flag
 			  isStamped = !isStamped;
+        $('.main_content').scrollTop(0);
 			});
+
+      // Vue
+      var vueMessage = new Vue({
+        el: '#msg_content',
+        data: oItem,
+        mounted: function () {
+          var oMsgQuestion = $('.grid-item');
+          $grid.prepend(oMsgQuestion).masonry('prepended', oMsgQuestion);
+        },
+        beforeUpdate: function () {
+          // $stamp.hide();
+          // $grid.masonry('unstamp', $stamp);
+          //
+          // var oMsgQuestion = $('.grid-item');
+          // $grid.masonry('prepended', oMsgQuestion[0]);
+        },
+        Update: function () {
+          // $grid.masonry('reloadItems');
+          // $grid.masonry('layout');
+        }
+      })
+
+      // 送出留言
+      $('#sumbit_btn').click(function() {
+        var dt = new Date();
+        var oMessage = {
+          attachefile: '0',
+          create_time: dt.getFullYear() + '-' + dt.getMonth() + '-' + dt.getDate() + '-' + dt.getHours() + '-' + dt.getMinutes() + '-' + dt.getSeconds(),
+          create_user: oItem.Userid,
+          delete_falg: '0',
+          read_mk: '0',
+          msg_content: $('#edit_text').val(),
+          touser_id: 'yuanhsuanch@gmail.com',
+          touser_name: 'dhc'
+        };
+        // oItem.Message.push(oMessage);
+
+        $.ajax({
+            url: './modules/message/uploadmessage.php',
+            data: oMessage,
+            method: "POST",
+            success: function (sRtn) {
+              location.reload();
+              var oRtn = JSON.parse(sRtn);
+              if ('SUCCESS' === oRtn.STATUS) {
+              }
+              else {
+                // alert('檔案上傳失敗' + ' ' + oRtn.MSG);
+              }
+            },
+            error: function (jqXHR, textStatus, errorMessage) {
+                alert('伺服器連線不穩定，請稍後再試!')
+            }
+        });
+      });
+
+      // 回覆留言
+      $('.qa_content > div > input').keydown(function (e) {
+        if (13 == event.which) {
+          // send
+        }
+      });
 
       // 新增 檔案
       $('body').on('change', '.toolbar > li > i > input', function (e) {
@@ -168,17 +235,17 @@
           return;
         }
         var fileupload = $('#uplodefile').prop('files')[0];
-        var form_data = new FormData();
-        form_data.append('import_file', fileupload);
+        var oForm = new FormData();
+        oForm.append('import_file', fileupload);
 
         $.ajax({
             url: './modules/message/checkfile.php',
-            data: form_data,
+            data: oForm,
             method: "POST",
             processData: false,
             contentType: false,
             success: function (sRtn) {
-              // console.log(sRtn);
+              console.log(sRtn);
               var oRtn = JSON.parse(sRtn);
               if ('SUCCESS' === oRtn.STATUS) {
                 var reader = new FileReader();
@@ -229,7 +296,7 @@
           $grid.masonry('layout');
       }).keydown();
 
-      // 區塊收合
+      // 留言區塊
 			$grid.on('click','.grid-item', function(e) {
         if ($(e.target).is('input') || $(e.target).closest('div').hasClass('qa_content') || $(e.target).parent().hasClass('filename')) {
           return;
@@ -244,8 +311,9 @@
         window.location.href = '#' + ranId;
 			});
 
-			$grid.masonry();
+      $grid.masonry();
       $.LoadingOverlay('hide');
+      $('#msg_content').css('display', '');
   });
 });
 
@@ -278,32 +346,49 @@
               <ul class="filebox"></ul>
 							<button id="sumbit_btn" name="sumbit_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
-            <div id="msg_content">
+            <div id="msg_content" style="display:none;">
               <section v-for="item in Message" class="grid-item">
                 <!-- {{item}} -->
                 <div class="qa_title">
   								<ul>
-  									<li><span class="name">{{item.create_user}}<span class="messagetoico"></span>{{item.touser_id}}</span><span class="time">2017-10-23 14:00</span></li>
+  									<li><span class="name">{{item.create_user}}<span class="messagetoico"></span>{{item.touser_name}}</span><span class="time">2017-10-23 14:00</span></li>
   									<li>
-                      <span class="text">{{item.msg_content}}</span>
+                      <span class="text" v-html="item.msg_content"></span>
   									</li>
+                    <li v-if="item.img">
+                      <img class="qaimg" src="./include/srcoe.jpg" />
+                    </li>
   									<li>
-                      <span class="attachedfile" v-if="!item.attachedfile" >
-                        <i class="ico"></i>
+                      <span class="attachedfile">
+                        <i class="ico" v-if="item.attachedfile"></i>
                         <span class="filename">
-                          <span>filenanme</span>
-                          <span>filenanme</span>
-                          <span>filenanme</span>
+                          <span v-if="item.attachedfile">filenanme</span>
+                          <span v-if="item.attachedfile">filenanme</span>
+                          <span v-if="item.attachedfile">filenanme</span>
                         </span>
                         <span class="info">留言數(2)</span>
                       </span>
                     </li>
   								</ul>
   							</div>
+                <div class="qa_content">
+                  <ul>
+                    <li>
+                      <span class="name">6年9班老師</span>
+                      <span class="text">感謝老師教導有方</span>
+                      <span class="time">2017-10-25 09:06</span>
+                    </li>
+                    <li>
+                      <span class="name">實驗6年9班老師</span>
+                      <span class="text">是學生自己用功的</span>
+                      <span class="time">2017-10-25 09:06</span>
+                    </li>
+                  </ul>
+                  <div><input type="text" placeholder="留言‧‧‧‧‧" /></div>
+                </div>
   						</section>
             </div>
-
-						<section class="grid-item">
+						<!-- <section class="grid-item">
 							<div class="qa_title">
 								<ul>
 									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
@@ -456,7 +541,7 @@
 								</ul>
 								<div><input type="text" placeholder="留言‧‧‧‧‧" /></div>
 							</div>
-						</section>
+						</section> -->
           </article>
         </div>
 	   </div>

@@ -6,9 +6,9 @@
   	session_start();
   }
 
-  $oSQLUplaodMessage = $dbh->prepare("INSERT INTO message_master
-     (msg_sn, touser_id, msg_type, msg_content, create_time, create_user, attachefile, read_mk, delete_falg)
-     VALUES (NULL, :touser_id, :msg_type, :msg_content, :create_time, :create_user, :attachefile, :read_mk, :delete_falg)");
+  $oSQLUplaodMessage = $dbh->prepare("INSERT INTO message_response
+     (response_sn, message_sn, response_content, create_user, create_time)
+     VALUES (NULL, :message_sn, :response_content, :create_user, :create_time");
 
   $sToUserid = $_POST['touser_id'];
   $sContent = $_POST['msg_content'];
@@ -26,6 +26,5 @@
   $oSQLUplaodMessage->bindValue(':read_mk', $sRead_mk, PDO::PARAM_STR);
   $oSQLUplaodMessage->bindValue(':delete_falg', $sDele, PDO::PARAM_STR);
   $oSQLUplaodMessage->execute();
-
 
   echo json_encode($_POST);
