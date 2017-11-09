@@ -7,12 +7,18 @@
   }
   $sUserID = $_SESSION['user_id'];
   $sSQLMessage = "SELECT * FROM message_master
-    LEFT JOIN message_response
-    ON message_master.msg_sn = message_response.message_sn
-    LEFT JOIN message_fileattached
-    ON message_master.msg_sn = message_fileattached.message_sn
-    WHERE message_master.delete_falg = '0' AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
-    ORDER BY message_master.create_time DESC";
+    LEFT JOIN message_response ON message_master.msg_sn = message_response.message_sn
+    LEFT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
+    WHERE message_master.msg_type='2'
+    AND message_master.delete_flag='0'
+    AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+    UNION
+    SELECT * FROM message_master
+    RIGHT JOIN message_response ON message_master.msg_sn = message_response.message_sn
+    RIGHT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
+    WHERE message_master.msg_type='2'
+    AND message_master.delete_flag = '0'
+    AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')";
   $oMessage = $dbh->prepare($sSQLMessage);
   $oMessage->execute();
   $vMessageData = $oMessage->fetchAll(\PDO::FETCH_ASSOC);
@@ -24,24 +30,42 @@
                               'Message' => $vMessageData));
 
   function handleData($vMessageData) {
-<<<<<<< HEAD
-    print_r($vMessageData);
-=======
-    // print_r($vMessageData);
->>>>>>> 19637d70a26fc6df0814ff40f5140fb1a2db0eea
+    $vNewData = array();
     foreach ($vMessageData as $key => $vMsg) {
-      $vMessageData[$key]['create_user'] = id2uname($vMsg['create_user']);
-      $vMessageData[$key]['touser_name'] = id2uname($vMsg['touser_id']);
-      $vMessageData[$key]['create_time'] = substr($vMsg['create_time'], 0, 16);
-      $vMessageData[$key]['msg_content'] = str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['msg_content']);
+      if (!isset($vNewData[$vMsg['msg_sn']])) {
+        $vNewData[$vMsg['msg_sn']]['msg_sn'] = $vMsg['msg_sn'];
+        $vNewData[$vMsg['msg_sn']]['touser_name'] = id2uname($vMsg['touser_id']);
+        $vNewData[$vMsg['msg_sn']]['create_user'] = id2uname($vMsg['create_user']);
+        $vNewData[$vMsg['msg_sn']]['create_time'] = substr($vMsg['create_time'], 0, 16);
+        $vNewData[$vMsg['msg_sn']]['msg_content'] = str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['msg_content']);
+        $vNewData[$vMsg['msg_sn']]['attachefile'] = $vMsg['attachefile'];
+        $vNewData[$vMsg['msg_sn']]['read_mk'] = $vMsg['read_mk'];
+        $vNewData[$vMsg['msg_sn']]['delete_flag'] = $vMsg['delete_flag'];
+        $vNewData[$vMsg['msg_sn']]['response_total'] = 0;
+      }
+      if (isset($vMsg['file_sn'])) {
+        $vNewData[$vMsg['msg_sn']]['msgfile'][$vMsg['file_sn']] = array('file_orgnialname' => $vMsg['file_orgnialname'],
+                                                                        'file_replacename' => $vMsg['file_replacename'],
+                                                                        'upload_time' => substr($vMsg['upload_time'], 0, 16));
+
+      }
+      if ($vMsg['response_sn']) {
+        $vNewData[$vMsg['msg_sn']]['response_total']++;
+        $vNewData[$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => $vMsg['response_content'],
+                                                                          'remsg_create_user' => $vMsg['remsg_create_user'],
+                                                                          'remsg_create_time' => substr($vMsg['remsg_create_time'], 0, 16));
+      }
     }
-    return $vMessageData;
+
+    return $vNewData;
   }
 ?>
 <!DOCTYPE HTML>
 <html>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
 <style>
-  ul, li {margin:0;padding: 0;list-style: none;}
+  ul, li {margin:0px;padding:0px;list-style:none;}
+  textarea {resize:none;}
   .main_content {height:700px;width:100%;overflow:hidden;overflow-y:auto;}
 
   .main_content::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
@@ -62,7 +86,7 @@
   /* 留言標題 */
   .qa_title > ul > li {position:relative;overflow:hidden;}
   .qa_title > ul > li > .name {color:rgb(0, 0, 255);}
-  .qa_title > ul > li > .time {padding:0px 4px;font-size:14px;}
+  .qa_title > ul > li > .time {padding:0px 4px;font-size:14px;max-width:8em;vertical-align:middle;white-space:nowrap;display:inline-block;text-overflow:ellipsis;overflow:hidden;}
   /*.qa_title > ul > li > .text {padding-left:1em;}*/
   .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
   .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;}
@@ -74,10 +98,10 @@
   /* 留言回覆 */
   .qa_content > ul > li > .name {color:rgb(0, 0, 255);}
   .qa_content > ul > li > .time {font-size:14px;color:rgb(157, 157, 157);}
+  .qa_content .input-group textarea {height: 38px !important;overflow: hidden !important;}
 
   /* 留言給家長 */
   .stamp {display:block;max-width:1150px;margin-bottom:4px;overflow-y:auto;background-color:#F8F8F8;}
-  .stamp > textarea {resize:none;}
   .stamp-button {cursor:pointer;margin:0px;margin-bottom:4px;}
 
   /* 留言功能 */
@@ -110,6 +134,7 @@
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
     .accordionPart > section.open {width:100%;float:left;}
+    .qa_title > ul > li > .time {max-width:11em;}
   }
 </style>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.1/vue.js"></script>
@@ -165,15 +190,8 @@
           $grid.prepend(oMsgQuestion).masonry('prepended', oMsgQuestion);
         },
         beforeUpdate: function () {
-          // $stamp.hide();
-          // $grid.masonry('unstamp', $stamp);
-          //
-          // var oMsgQuestion = $('.grid-item');
-          // $grid.masonry('prepended', oMsgQuestion[0]);
         },
         Update: function () {
-          // $grid.masonry('reloadItems');
-          // $grid.masonry('layout');
         }
       })
 
@@ -184,7 +202,7 @@
           attachefile: '0',
           create_time: dt.getFullYear() + '-' + dt.getMonth() + '-' + dt.getDate() + '-' + dt.getHours() + '-' + dt.getMinutes() + '-' + dt.getSeconds(),
           create_user: oItem.Userid,
-          delete_falg: '0',
+          delete_flag: '0',
           read_mk: '0',
           msg_content: $('#edit_text').val(),
           touser_id: 'yuanhsuanch@gmail.com',
@@ -294,16 +312,43 @@
       });
 
       // textarea 自動高
-      $('textarea.auto-height').css('overflow', 'hidden').bind('keydown keyup', function() {
+      $('.auto-height').css('overflow', 'hidden').bind('keydown keyup', function(e) {
+        // if (e.ctrlKey && e.keyCode == 13 && $(e.target).parent().is('div')) {
+        //   var val = this.value;
+        //     console.log('val',  val);
+        //     if (typeof this.selectionStart == "number" && typeof this.selectionEnd == "number") {
+        //         var start = this.selectionStart;
+        //         this.value = val.slice(0, start) + "\n" + val.slice(this.selectionEnd);
+        //         this.selectionStart = this.selectionEnd = start + 1;
+        //         console.log(start ,this.selectionStart, this.selectionEnd);
+        //     } else if (document.selection && document.selection.createRange) {
+        //         this.focus();
+        //         var range = document.selection.createRange();
+        //         range.text = "\r\n";
+        //         range.collapse(false);
+        //         range.select();
+        //     }
+        // }
+        // if (e.keyCode == 13 && $(e.target).parent().is('div')) {
+          // return false;
+        // }
+
+        if ($(e.target).hasClass('form-control')) {
+          $(this).attr("style", "height:0px !important").attr("style", "height: " + $(this).prop('scrollHeight') + "px !important");
+          $('#stamp').attr("style", "height: " + $(this).height() + "px !important");
+        }
+        else {
           $(this).height('0px').height($(this).prop('scrollHeight') + 'px');
           $('#stamp').height($(this).height());
-          $grid.masonry('reloadItems');
-          $grid.masonry('layout');
+        }
+
+        $grid.masonry('reloadItems');
+        $grid.masonry('layout');
       }).keydown();
 
       // 留言區塊
 			$grid.on('click','.grid-item', function(e) {
-        if ($(e.target).is('input') || $(e.target).closest('div').hasClass('qa_content') || $(e.target).parent().hasClass('filename')) {
+        if ($(e.target).is('textarea') || $(e.target).closest('div').hasClass('qa_content') || $(e.target).parent().hasClass('filename')) {
           return;
         }
 
@@ -365,188 +410,32 @@
                     </li>
   									<li>
                       <span class="attachedfile">
-                        <i class="ico" v-if="item.attachedfile"></i>
-                        <span class="filename">
-                          <span v-if="item.attachedfile">filenanme</span>
-                          <span v-if="item.attachedfile">filenanme</span>
-                          <span v-if="item.attachedfile">filenanme</span>
+                        <i class="ico" v-if="item.msgfile"></i>
+                        <span class="filename" v-for="oFile in item.msgfile">
+                          <span v-if="oFile.file_orgnialname">{{oFile.file_orgnialname}}</span>
                         </span>
-                        <span class="info">留言數(2)</span>
+                        <span class="info" v-if="item.response_total">留言數({{item.response_total}})</span>
                       </span>
                     </li>
   								</ul>
   							</div>
                 <div class="qa_content">
-                  <ul>
+                  <ul v-for="oReMsg in item.remsg">
                     <li>
-                      <span class="name">6年9班老師</span>
-                      <span class="text">感謝老師教導有方</span>
-                      <span class="time">2017-10-25 09:06</span>
-                    </li>
-                    <li>
-                      <span class="name">實驗6年9班老師</span>
-                      <span class="text">是學生自己用功的</span>
-                      <span class="time">2017-10-25 09:06</span>
+                      <span class="name">{{oReMsg.remsg_create_user}}</span>
+                      <span class="text">{{oReMsg.response_content}}</span>
+                      <span class="time">{{oReMsg.remsg_create_time}}</span>
                     </li>
                   </ul>
-                  <div><input type="text" placeholder="留言‧‧‧‧‧" /></div>
+                  <div class="input-group" style="padding:4px;">
+                    <textarea class="form-control auto-height" type="text" placeholder="留言‧‧‧‧‧" rows="1"></textarea>
+                    <span class="input-group-btn">
+                      <button type="button" class="btn btn-secondary">送出</button>
+                    </span>
+                  </div>
                 </div>
   						</section>
             </div>
-						<!-- <section class="grid-item">
-							<div class="qa_title">
-								<ul>
-									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
-									<li>
-                    <span class="text">
-										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
-										不過，令人遺憾的是你的工作能力有待提高。老師真誠地希望你在工作上要向她人學習，做一名人見人愛的好學生。
-                    </span>
-									</li>
-									<li>
-                    <span class="attachedfile">
-                      <i class="ico"></i>
-                      <span class="filename">
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                      </span>
-                      <span class="info">留言數(2)</span>
-                    </span>
-                  </li>
-								</ul>
-							</div>
-							<div class="qa_content">
-								<ul>
-									<li>
-										<span class="name">6年9班老師</span>
-										<span class="text">感謝老師教導有方</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-									<li>
-										<span class="name">實驗6年9班老師</span>
-										<span class="text">是學生自己用功的</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-								</ul>
-								<div><input type="text" placeholder="留言‧‧‧‧‧" /></div>
-							</div>
-						</section>
-						<section class="grid-item">
-							<div class="qa_title">
-								<ul>
-									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
-									<li><span class="text">學期成績</span></li>
-									<li>
-                    <img class="qaimg" src="./include/srcoe.jpg" />
-                  </li>
-                  <li>
-                    <span class="attachedfile">
-                      <i class="ico"></i>
-                      <span class="filename">
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                      </span>
-                      <span class="info">留言數(2)</span>
-                    </span>
-                  </li>
-								</ul>
-							</div>
-							<div class="qa_content">
-								<ul>
-									<li>
-										<span class="name">王先生</span>
-										<span class="text">感謝老師教導有方</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-									<li>
-										<span class="name">實驗6年9班老師</span>
-										<span class="text">是學生自己用功的</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-								</ul>
-								<div><input type="text" placeholder="留言‧‧‧‧‧" /></div>
-							</div>
-						</section>
-            <section class="grid-item">
-							<div class="qa_title">
-								<ul>
-									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
-									<li>
-                    <span class="text">
-										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
-										不過，令人遺憾的是你的工作能力有待提高。老師真誠地希望你在工作上要向她人學習，做一名人見人愛的好學生。
-                    </span>
-									</li>
-                  <li>
-                    <span class="attachedfile">
-                      <i class="ico"></i>
-                      <span class="filename">
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                      </span>
-                      <span class="info">留言數(2)</span>
-                    </span>
-                  </li>
-								</ul>
-							</div>
-							<div class="qa_content">
-								<ul>
-									<li>
-										<span class="name">王先生</span>
-										<span class="text">感謝老師教導有方</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-									<li>
-										<span class="name">實驗6年9班老師</span>
-										<span class="text">是學生自己用功的</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-								</ul>
-								<div><input type="text" placeholder="留言‧‧‧‧‧" /></div>
-							</div>
-						</section>
-            <section class="grid-item">
-							<div class="qa_title">
-								<ul>
-									<li><span class="name">小明家長<span class="messagetoico"></span>我</span><span class="time">2017-10-23 14:00</span></li>
-									<li>
-                    <span class="text">
-										你尊敬老師，團結同學，是老師的得力助手。令老師感到欣慰的是，你上課精彩的發言，總能搏得同學的讚賞。
-										不過，令人遺憾的是你的工作能力有待提高。老師真誠地希望你在工作上要向她人學習，做一名人見人愛的好學生。
-                    </span>
-									</li>
-                  <li>
-                    <span class="attachedfile">
-                      <i class="ico"></i>
-                      <span class="filename">
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                        <span>filenanme</span>
-                      </span>
-                      <span class="info">留言數(2)</span>
-                    </span>
-                  </li>
-								</ul>
-							</div>
-							<div class="qa_content">
-								<ul>
-									<li>
-										<span class="name">王先生</span>
-										<span class="text">感謝老師教導有方</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-									<li>
-										<span class="name">實驗6年9班老師</span>
-										<span class="text">是學生自己用功的</span>
-										<span class="time">2017-10-25 09:06</span>
-									</li>
-								</ul>
-								<div><input type="text" placeholder="留言‧‧‧‧‧" /></div>
-							</div>
-						</section> -->
           </article>
         </div>
 	   </div>
