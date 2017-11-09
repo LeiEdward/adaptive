@@ -24,7 +24,11 @@
                               'Message' => $vMessageData));
 
   function handleData($vMessageData) {
+<<<<<<< HEAD
     print_r($vMessageData);
+=======
+    // print_r($vMessageData);
+>>>>>>> 19637d70a26fc6df0814ff40f5140fb1a2db0eea
     foreach ($vMessageData as $key => $vMsg) {
       $vMessageData[$key]['create_user'] = id2uname($vMsg['create_user']);
       $vMessageData[$key]['touser_name'] = id2uname($vMsg['touser_id']);
@@ -140,7 +144,8 @@
 			  if ( isStamped ) {
 					$stamp.hide();
 			    $grid.masonry( 'unstamp', $stamp );
-			  } else {
+			  }
+        else {
 					$stamp.show();
 			    $grid.masonry( 'stamp', $stamp );
 			  }
@@ -308,7 +313,7 @@
 
         var ranId = Math.random();
         $(e.target).attr('id', ranId);
-        window.location.href = '#' + ranId;
+        // window.location.href = '#' + ranId;
 			});
 
       $grid.masonry();
