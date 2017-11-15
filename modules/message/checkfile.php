@@ -9,7 +9,7 @@
   $vRtn = array();
   $sUserID = $_SESSION['user_id'];
   $vRtn['STATUS'] = 'SUCCESS';
-  $vRtn['fileindex'] = $_FILES['fileindex'];
+
   switch($_FILES['import_file']['type']) {
     case 'application/vnd.openxmlformats-officedocument.presentationml.presentation': //pptx
     case 'application/vnd.ms-powerpoint': // ppt
@@ -33,12 +33,12 @@
     case 'image/png':
     case 'image/gif':
     case 'image/bmp':
-      $sFileType = 'imgage';
+      $sFileType = 'image';
       break;
 
     default:
       $vRtn['STATUS'] = 'ERR';
-      $vRtn['MSG'] = '錯誤代碼: MD_MSG_UFx040';
+      $vRtn['MSG'] = '錯誤代碼: MD_MSG_UFx041';
       break;
   }
 
@@ -46,7 +46,8 @@
   $sFileName = $_SESSION['user_id'].'_'.str_replace('.', '_', $sTimeSatmp).'_'.$_FILES['import_file']['name'];
 
   // !!
-  $_SESSION['message']['uploadfile'][] = $sFileName;
+  $_SESSION['message']['uploadfile'][] = array('name' => $sFileName,
+                                               'orgnialname' => $_FILES['import_file']['name']);
 
   if ('SUCCESS' === $vRtn['STATUS'] && move_uploaded_file($_FILES['import_file']['tmp_name'], '../../tmp/'.$sFileName)) {
     $oSQLUploadfile = $dbh->prepare("INSERT INTO message_fileattached
@@ -58,10 +59,11 @@
     $oSQLUploadfile->bindValue(':upload_userid', $sUserID, PDO::PARAM_STR);
     $oSQLUploadfile->bindValue(':upload_time', date("Y-m-d H:i:s"), PDO::PARAM_STR);
   	$oSQLUploadfile->execute();
+    $vRtn['fileid'] = $sFileName;
   }
   else {
     $vRtn['STATUS'] = 'ERR';
-    $vRtn['MSG'] = '請重新上傳，錯誤代碼: MD_MSG_UFx062';
+    $vRtn['MSG'] = '請重新上傳，錯誤代碼: MD_MSG_UFx065';
   }
 
   echo json_encode($vRtn);

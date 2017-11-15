@@ -5,58 +5,107 @@
   if (!isset($_SESSION)) {
   	session_start();
   }
-  $sUserID = $_SESSION['user_id'];
-  $sSQLMessage = "SELECT * FROM message_master
-    LEFT JOIN message_response ON message_master.msg_sn = message_response.message_sn
-    LEFT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
-    WHERE message_master.msg_type='2'
-    AND message_master.delete_flag='0'
-    AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
-    UNION
-    SELECT * FROM message_master
-    RIGHT JOIN message_response ON message_master.msg_sn = message_response.message_sn
-    RIGHT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
-    WHERE message_master.msg_type='2'
-    AND message_master.delete_flag = '0'
-    AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')";
-  $oMessage = $dbh->prepare($sSQLMessage);
-  $oMessage->execute();
-  $vMessageData = $oMessage->fetchAll(\PDO::FETCH_ASSOC);
 
+  // 取得 user 資料
+  $vUserData = get_object_vars($_SESSION['user_data']);
+  $sUserID = $vUserData['user_id'];
+
+  $vToParent = getParents($vUserData['grade'], $vUserData['class_name']);
+  $vMessageData = getMessage($sUserID);
   $vMessageData = handleData($vMessageData);
 
   // 整理資料, 統一變數傳至HTML
   $sJSOject = arraytoJS(array('Userid' => $sUserID,
                               'Message' => $vMessageData));
 
-  function handleData($vMessageData) {
-    $vNewData = array();
-    foreach ($vMessageData as $key => $vMsg) {
-      if (!isset($vNewData[$vMsg['msg_sn']])) {
-        $vNewData[$vMsg['msg_sn']]['msg_sn'] = $vMsg['msg_sn'];
-        $vNewData[$vMsg['msg_sn']]['touser_name'] = id2uname($vMsg['touser_id']);
-        $vNewData[$vMsg['msg_sn']]['create_user'] = id2uname($vMsg['create_user']);
-        $vNewData[$vMsg['msg_sn']]['create_time'] = substr($vMsg['create_time'], 0, 16);
-        $vNewData[$vMsg['msg_sn']]['msg_content'] = str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['msg_content']);
-        $vNewData[$vMsg['msg_sn']]['attachefile'] = $vMsg['attachefile'];
-        $vNewData[$vMsg['msg_sn']]['read_mk'] = $vMsg['read_mk'];
-        $vNewData[$vMsg['msg_sn']]['delete_flag'] = $vMsg['delete_flag'];
-        $vNewData[$vMsg['msg_sn']]['response_total'] = 0;
-      }
-      if (isset($vMsg['file_sn'])) {
-        $vNewData[$vMsg['msg_sn']]['msgfile'][$vMsg['file_sn']] = array('file_orgnialname' => $vMsg['file_orgnialname'],
-                                                                        'file_replacename' => $vMsg['file_replacename'],
-                                                                        'upload_time' => substr($vMsg['upload_time'], 0, 16));
+  function getMessage($sUserID) {
+    global $dbh;
 
+    $sSQLMessage = "SELECT * FROM message_master
+      LEFT JOIN message_response ON message_master.msg_sn = message_response.message_sn
+      LEFT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
+      WHERE message_master.msg_type = '2'
+      AND message_master.delete_flag = '0'
+      AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+      UNION
+      SELECT * FROM message_master
+      RIGHT JOIN message_response ON message_master.msg_sn = message_response.message_sn
+      RIGHT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
+      WHERE message_master.msg_type = '2'
+      AND message_master.delete_flag = '0'
+      AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID') ORDER BY msg_sn DESC";
+    $oMessage = $dbh->prepare($sSQLMessage);
+    $oMessage->execute();
+    $vMessageData = $oMessage->fetchAll(\PDO::FETCH_ASSOC);
+
+    return $vMessageData;
+  }
+
+  function getParents($sGroup, $sClass) {
+    global $dbh;
+
+    $sSQLParents = "SELECT user_info.user_id, user_family.fuser_id FROM user_info
+      LEFT JOIN user_family ON user_info.user_id = user_family.user_id
+      WHERE user_info.grade = '6'
+      AND user_info.class = '9'
+      AND user_info.user_id LIKE '%ss%'
+      AND LENGTH(user_family.user_id) > 4";
+    $oParents = $dbh->prepare($sSQLParents);
+    $oParents->execute();
+    $vParentsData = $oParents->fetchAll(\PDO::FETCH_ASSOC);
+
+    if (!empty($vParentsData) && is_array($vParentsData)) {
+      $vToParent = array();
+      $vToParent[] = '<select id="sel_parent">';
+      $vToParent[] =   '<option value="">全部家長</option>';
+      foreach($vParentsData as $vParent) {
+        $sStudentName = id2uname($vParent['user_id']);
+        $vToParent[] = '<option value="'.$vParent['fuser_id'].'">'.$sStudentName.'  家長</option>';
       }
-      if ($vMsg['response_sn']) {
-        $vNewData[$vMsg['msg_sn']]['response_total']++;
-        $vNewData[$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => $vMsg['response_content'],
-                                                                          'remsg_create_user' => $vMsg['remsg_create_user'],
-                                                                          'remsg_create_time' => substr($vMsg['remsg_create_time'], 0, 16));
-      }
+      $vToParent[] = '</select>';
     }
 
+    return $vToParent;
+  }
+
+  function handleData($vMessageData) {
+    global $sUserID;
+
+    $vNewData = array();
+    foreach ($vMessageData as $key => $vMsg) {
+      if (!isset($vNewData['msg_'.$vMsg['msg_sn']])) {
+        $vNewData['msg_'.$vMsg['msg_sn']]['msg_sn'] = $vMsg['msg_sn'];
+        $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = id2uname($vMsg['touser_id']);
+        $vNewData['msg_'.$vMsg['msg_sn']]['create_user'] = id2uname($vMsg['create_user']);
+        $vNewData['msg_'.$vMsg['msg_sn']]['create_time'] = substr($vMsg['create_time'], 0, 16);
+        $vNewData['msg_'.$vMsg['msg_sn']]['msg_content'] = str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['msg_content']);
+        $vNewData['msg_'.$vMsg['msg_sn']]['attachefile'] = $vMsg['attachefile'];
+        $vNewData['msg_'.$vMsg['msg_sn']]['read_mk'] = $vMsg['read_mk'];
+        $vNewData['msg_'.$vMsg['msg_sn']]['delete_flag'] = $vMsg['delete_flag'];
+        $vNewData['msg_'.$vMsg['msg_sn']]['response_total'] = 0;
+      }
+      if (isset($vMsg['file_sn'])) {
+        switch($vMsg['filetype']) {
+          case 'image':
+            $vNewData['msg_'.$vMsg['msg_sn']]['msgimg'][$vMsg['file_sn']] = array('filesrc' => './data/message/'.$sUserID.'/'.$vMsg['file_replacename']);
+            break;
+
+          default:
+            $vNewData['msg_'.$vMsg['msg_sn']]['msgfile'][$vMsg['file_sn']] = array('file_orgnialname' => $vMsg['file_orgnialname'],
+                                                                                   'file_replacename' => $vMsg['file_replacename'],
+                                                                                   'upload_time' => substr($vMsg['upload_time'], 0, 16),
+                                                                                   'filesrc' => './data/message/'.$sUserID.'/'.$vMsg['file_replacename']);
+            break;
+        }
+      }
+      if ($vMsg['response_sn']) {
+        $vNewData['msg_'.$vMsg['msg_sn']]['response_total']++;
+        $vNewData['msg_'.$vMsg['msg_sn']]['remsgindex'] = $vMsg['response_sn'];
+        $vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['response_content']),
+                                                                                 'remsg_create_user' => id2uname($vMsg['remsg_create_user']),
+                                                                                 'remsg_create_time' => substr($vMsg['remsg_create_time'], 0, 16));
+      }
+    }
     return $vNewData;
   }
 ?>
@@ -76,6 +125,7 @@
   .filebox::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
 
   /* 留言浮動框 */
+  .grid-item {margin-bottom:5px;}
   .accordionPart > section {border:solid 1px #E3E3E3;}
   .accordionPart > section.grid-item {width:320px;float:left;}
   .accordionPart > section.open {width:100%;float:left;}
@@ -89,7 +139,7 @@
   .qa_title > ul > li > .time {padding:0px 4px;font-size:14px;max-width:8em;vertical-align:middle;white-space:nowrap;display:inline-block;text-overflow:ellipsis;overflow:hidden;}
   /*.qa_title > ul > li > .text {padding-left:1em;}*/
   .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
-  .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;}
+  .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;justify-content:flex-end;}
   .qa_title > ul > li > .attachedfile > .ico {display:inline-block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;background-image: url("./images/toolbar/file.png");}
   .qa_title > ul > li > .attachedfile > .filename {flex:80;display:flex;justify-content:stretch;overflow:hidden;white-space: nowrap;}
   .qa_title > ul > li > .attachedfile > .filename > span {margin-right:4px;overflow:hidden;text-overflow:ellipsis;text-decoration:underline;}
@@ -146,13 +196,13 @@
 <script>
   var iFileSizeLimit = 3072000; // 3M (1M = 1024000)
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
-  console.log(oItem);
+  var sDelFile = '';
 
+  console.log(oItem);
   $(function() {
 		$.LoadingOverlay('show');
 
 		$(document).ready(function() {
-
       // masonry
       var $grid = $('.grid').masonry({
 			  itemSelector: '.grid-item',
@@ -189,51 +239,116 @@
           var oMsgQuestion = $('.grid-item');
           $grid.prepend(oMsgQuestion).masonry('prepended', oMsgQuestion);
         },
-        beforeUpdate: function () {
-        },
-        Update: function () {
+        methods: {
+          addMessage: function() {
+          },
+          addremsg: function(oArg) {
+            console.log(oArg);
+            if (0 === this.Message[oArg.index].response_total) {
+              // 留言資料
+              this.Message[oArg.index].remsg = Object.assign({}, this.Message[oArg.index] .remsg, {
+                0: oArg.data
+              });
+
+              // 留言index
+              this.$set(this.Message[oArg.index], 'remsgindex', 1);
+
+              // 留言筆數
+              this.$set(this.Message[oArg.index], 'response_total', 1);
+            }
+            else {
+              // 留言資料
+              this.$set(this.Message[oArg.index].remsg, this.Message[oArg.index].remsgindex + 1, oArg.data);
+
+              // 留言index
+              this.$set(this.Message[oArg.index], 'remsgindex', this.Message[oArg.index].remsgindex + 1);
+
+              // 留言筆數
+              this.$set(this.Message[oArg.index], 'response_total', this.Message[oArg.index].response_total + 1);
+            }
+            vueMessage.$nextTick(function () {
+              $grid.masonry('reloadItems');
+              $grid.masonry('layout');
+            })
+          }
         }
       })
 
       // 送出留言
       $('#sumbit_btn').click(function() {
-        var dt = new Date();
         var oMessage = {
-          attachefile: '0',
-          create_time: dt.getFullYear() + '-' + dt.getMonth() + '-' + dt.getDate() + '-' + dt.getHours() + '-' + dt.getMinutes() + '-' + dt.getSeconds(),
+          attachefile: ($('.filebox').children().length > 0) ? '1': '0',
           create_user: oItem.Userid,
           delete_flag: '0',
           read_mk: '0',
           msg_content: $('#edit_text').val(),
-          touser_id: 'yuanhsuanch@gmail.com',
-          touser_name: 'dhc'
+          touser_id: $('#sel_parent').val(),
+          deletefile: sDelFile
         };
-        // oItem.Message.push(oMessage);
 
         $.ajax({
             url: './modules/message/uploadmessage.php',
             data: oMessage,
             method: "POST",
             success: function (sRtn) {
-              location.reload();
               var oRtn = JSON.parse(sRtn);
               if ('SUCCESS' === oRtn.STATUS) {
+                location.reload();
               }
               else {
-                // alert('檔案上傳失敗' + ' ' + oRtn.MSG);
+                alert(oRtn.MSG);
+              }
+            },
+            error: function (jqXHR, textStatus, errorMessage) {
+              alert('伺服器連線不穩定，請稍後再試!');
+            }
+        });
+      });
+
+      // 回覆留言
+      $('.qa_content > .input-group > .input-group-btn > button').click(function (e) {
+        var sIndex;
+        $(e.target).parents().map(function () {
+          if ('qa_content' === $(this).attr('class')) {
+            sIndex = $(this).prev().attr('id');
+            sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
+          }
+        });
+        var oResponse = {
+          message_sn: sIndex,
+          remsg_create_user: oItem.Userid,
+          response_content: $('#response_textmsg_' + sIndex).val(),
+          remsg_delete_flag: '0'
+        };
+
+        if ('' === oResponse.response_content) return;
+
+        $.ajax({
+            url: './modules/message/uploadresponse.php',
+            data: oResponse,
+            method: "POST",
+            success: function (sRtn) {
+
+              var oRtn = JSON.parse(sRtn);
+              if ('SUCCESS' === oRtn.STATUS) {
+                vueMessage.addremsg({
+                  index: 'msg_' + oResponse.message_sn,
+                  data: {
+                    remsg_create_time: oRtn.TIME,
+                    remsg_create_user: oRtn.CREATEUSER,
+                    response_content: oRtn.CONTENT
+                  }
+                });
+                $('#response_textmsg_' + sIndex).val('');
+                $grid.masonry('reloadItems');
+              }
+              else {
               }
             },
             error: function (jqXHR, textStatus, errorMessage) {
                 alert('伺服器連線不穩定，請稍後再試!')
             }
         });
-      });
-
-      // 回覆留言
-      $('.qa_content > div > input').keydown(function (e) {
-        if (13 == event.which) {
-          // send
-        }
       });
 
       // 新增 檔案
@@ -268,17 +383,16 @@
             processData: false,
             contentType: false,
             success: function (sRtn) {
-              console.log(sRtn);
               var oRtn = JSON.parse(sRtn);
               if ('SUCCESS' === oRtn.STATUS) {
                 var reader = new FileReader();
                 reader.onload = function (e) {
                   $('.filebox').height('150px');
                   if (0 <= filetype.indexOf('image')) {
-                    $('.filebox').append('<li class="imgupload delete"><img src="' + e.target.result + '" /></li>');
+                    $('.filebox').append('<li id="' + oRtn.fileid + '" class="imgupload delete"><img src="' + e.target.result + '" /></li>');
                   }
                   else {
-                    $('.filebox').append('<li class="fileupload bd1 h125 delete"><div><img src="./images/toolbar/file.png" /><span>' + filename + '</span></div></li>');
+                    $('.filebox').append('<li id="' + oRtn.fileid + '" class="fileupload bd1 h125 delete"><div><img src="./images/toolbar/file.png" /><span>' + filename + '</span></div></li>');
                   }
                   $grid.masonry('reloadItems');
                   $grid.masonry('layout');
@@ -290,7 +404,7 @@
               }
             },
             error: function (jqXHR, textStatus, errorMessage) {
-                alert('伺服器連線不穩定，請稍後再試!')
+              alert('伺服器連線不穩定，請稍後再試!');
             }
         });
       })
@@ -300,8 +414,9 @@
         var sX = $(this).position().left;
         var sY = $(this).position().top;
         if (196 <= (e.pageX - sX) && 306 >= (e.pageY - sY) && $(e.target).is('li')) {
-          e.target.remove();
 
+          sDelFile += '[' + $(e.target).attr('id') + ']';
+          e.target.remove();
           // 如果沒有檔案, 畫面縮小
           if (0 === $('.filebox').children().length) {
             $('.filebox').height('0px');
@@ -313,25 +428,6 @@
 
       // textarea 自動高
       $('.auto-height').css('overflow', 'hidden').bind('keydown keyup', function(e) {
-        // if (e.ctrlKey && e.keyCode == 13 && $(e.target).parent().is('div')) {
-        //   var val = this.value;
-        //     console.log('val',  val);
-        //     if (typeof this.selectionStart == "number" && typeof this.selectionEnd == "number") {
-        //         var start = this.selectionStart;
-        //         this.value = val.slice(0, start) + "\n" + val.slice(this.selectionEnd);
-        //         this.selectionStart = this.selectionEnd = start + 1;
-        //         console.log(start ,this.selectionStart, this.selectionEnd);
-        //     } else if (document.selection && document.selection.createRange) {
-        //         this.focus();
-        //         var range = document.selection.createRange();
-        //         range.text = "\r\n";
-        //         range.collapse(false);
-        //         range.select();
-        //     }
-        // }
-        // if (e.keyCode == 13 && $(e.target).parent().is('div')) {
-          // return false;
-        // }
 
         if ($(e.target).hasClass('form-control')) {
           $(this).attr("style", "height:0px !important").attr("style", "height: " + $(this).prop('scrollHeight') + "px !important");
@@ -344,11 +440,12 @@
 
         $grid.masonry('reloadItems');
         $grid.masonry('layout');
-      }).keydown();
+      });
 
-      // 留言區塊
+      // 打開留言
 			$grid.on('click','.grid-item', function(e) {
-        if ($(e.target).is('textarea') || $(e.target).closest('div').hasClass('qa_content') || $(e.target).parent().hasClass('filename')) {
+        if ($(e.target).is('textarea') || $(e.target).closest('div').hasClass('qa_content') ||
+            $(e.target).parent().hasClass('filename') || $(e.target).is('button')) {
           return;
         }
 
@@ -356,9 +453,11 @@
 			  $grid.masonry('reloadItems');
 			  $grid.masonry('layout');
 
-        var ranId = Math.random();
-        $(e.target).attr('id', ranId);
-        // window.location.href = '#' + ranId;
+        $(e.target).parents().map(function () {
+          if ('qa_title' === $(this).attr('class')) {
+            window.location.href = '#' + $(this).attr('id');
+          }
+        });
 			});
 
       $grid.masonry();
@@ -384,11 +483,7 @@
               <ul class="toolbar">
                 <li>留言<span class="messagetoico"></span></li>
                 <li class="messageto">
-                  <select>
-                    <option value="">全部家長</option>
-                    <option value="">小明家長</option>
-                    <option value="">小美家長</option>
-                  <select>
+<?php echo implode('', $vToParent); ?>
                 </li>
                 <li><i class="file" title="上傳圖片/檔案"><input id="uplodefile" type="file" value="" /></i></li>
               </ul>
@@ -397,22 +492,21 @@
 							<button id="sumbit_btn" name="sumbit_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
             <div id="msg_content" style="display:none;">
-              <section v-for="item in Message" class="grid-item">
-                <!-- {{item}} -->
-                <div class="qa_title">
+              <section v-for="(item, index) in Message" class="grid-item">
+                <div v-bind:id="index" class="qa_title">
   								<ul>
-  									<li><span class="name">{{item.create_user}}<span class="messagetoico"></span>{{item.touser_name}}</span><span class="time">2017-10-23 14:00</span></li>
+  									<li><span class="name">{{item.create_user}}<span class="messagetoico"></span>{{item.touser_name}}</span><span class="time">{{item.create_time}}</span></li>
   									<li>
                       <span class="text" v-html="item.msg_content"></span>
   									</li>
-                    <li v-if="item.img">
-                      <img class="qaimg" src="./include/srcoe.jpg" />
+                    <li v-if="item.msgimg">
+                      <img v-for="oIMG in item.msgimg" v-bind:src="oIMG.filesrc" />
                     </li>
   									<li>
                       <span class="attachedfile">
                         <i class="ico" v-if="item.msgfile"></i>
                         <span class="filename" v-for="oFile in item.msgfile">
-                          <span v-if="oFile.file_orgnialname">{{oFile.file_orgnialname}}</span>
+                          <span v-if="oFile.file_orgnialname"><a v-bind:href="oFile.filesrc" v-bind:download="oFile.file_orgnialname">{{oFile.file_orgnialname}}</a></span>
                         </span>
                         <span class="info" v-if="item.response_total">留言數({{item.response_total}})</span>
                       </span>
@@ -423,12 +517,12 @@
                   <ul v-for="oReMsg in item.remsg">
                     <li>
                       <span class="name">{{oReMsg.remsg_create_user}}</span>
-                      <span class="text">{{oReMsg.response_content}}</span>
+                      <span class="text" v-html="oReMsg.response_content"></span>
                       <span class="time">{{oReMsg.remsg_create_time}}</span>
                     </li>
                   </ul>
                   <div class="input-group" style="padding:4px;">
-                    <textarea class="form-control auto-height" type="text" placeholder="留言‧‧‧‧‧" rows="1"></textarea>
+                    <textarea v-bind:id="'response_text' + index" class="form-control auto-height" type="text" placeholder="留言‧‧‧‧‧" rows="1"></textarea>
                     <span class="input-group-btn">
                       <button type="button" class="btn btn-secondary">送出</button>
                     </span>

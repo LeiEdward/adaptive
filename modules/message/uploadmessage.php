@@ -27,5 +27,58 @@
   $oSQLUplaodMessage->bindValue(':delete_flag', $sDele, PDO::PARAM_STR);
   $oSQLUplaodMessage->execute();
 
+  // 上傳檔案
+  $vRtn = array();
+  $vRtn['STATUS'] = 'SUCCESS';
+  if (1 <= $sAttached) {
+    $sDeleteFile = $_POST['deletefile'];
 
-  echo json_encode($_POST);
+    // 取得現在 message_master 流水號
+    $oSQLMessageInx = $dbh->prepare("SELECT auto_increment FROM information_schema.tables
+      WHERE table_schema = 'kbnattest'
+      AND table_name = 'message_master'");
+    $oSQLMessageInx->execute();
+    $vIndex = $oSQLMessageInx->fetch();
+    $sIndex = $vIndex['auto_increment']-1;
+
+    $sFilePath = '../../data/message/'.$_SESSION['user_id'];
+
+    if (isset($_SESSION['message']['uploadfile'])) {
+      if (!is_dir($sFilePath)) {
+        mkdir($sFilePath, 0777);
+        chmod($sFilePath, 0777);
+      }
+
+      foreach ($_SESSION['message']['uploadfile'] as $vFile) {
+        if (false !== strrpos($sDeleteFile, $vFile['name'])) continue;
+
+        if (file_exists('../../tmp/'.$vFile['name'])) {
+          if (rename('../../tmp/'.$vFile['name'], $sFilePath.'/'.$vFile['name'])) {
+            $vTmpFile[] = $vFile['name'];
+          }
+          else {
+            $vRtn['STATUS'] = 'ERR';
+            $vRtn['MSG'] = '檔案遺失請重新上傳，錯誤代碼: MD_MSG_UMx058';
+          }
+        }
+      }
+    }
+    else {
+      $vRtn['STATUS'] = 'ERR';
+      $vRtn['MSG'] = '檔案上傳異常，錯誤代碼: MD_MSG_UMx065';
+    }
+
+    if (!empty($vTmpFile)) {
+      $sFile = implode("','", $vTmpFile);
+      $oSQLUploadfile = $dbh->prepare("UPDATE message_fileattached
+         SET message_sn = $sIndex
+         WHERE file_replacename IN('$sFile')");
+      $oSQLUploadfile->execute();
+    }
+  }
+
+  !!
+  $_SESSION['message']['uploadfile'] = null;
+  unset($_SESSION['message']['uploadfile']);
+
+  echo json_encode($vRtn);
