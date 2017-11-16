@@ -414,7 +414,7 @@
       })
 
       // 刪除 圖片/檔案/留言
-      $('body').on('click', 'del', function (e) {
+      $('body').on('click', '.del', function (e) {
 
         // 刪除 圖片/檔案
         if ($(e.target).parent().is('li')) {
@@ -430,9 +430,8 @@
         }
 
         // 刪除留言
-        console.log($(e.target));
         if ($(e.target).parent().is('section')) {
-          console.log(123123);
+          var sDelIndex = $(e.target).next().attr('id');
         }
       });
 
