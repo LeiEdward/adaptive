@@ -126,7 +126,7 @@
   .filebox::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
 
   /* 留言浮動框 */
-  .grid-item {margin-bottom:5px;height:250;}
+  .grid-item {position:relative;margin-bottom:5px;height:250;}
   .accordionPart > section {border:solid 1px #E3E3E3;}
   .accordionPart > section.grid-item {width:320px;float:left;}
   .accordionPart > section.open {width:100%;float:left;}
@@ -138,8 +138,7 @@
   /* 留言標題 */
   .qa_title > ul > li {position:relative;overflow:hidden;}
   .qa_title > ul > li > .name {color:rgb(0, 0, 255);}
-  .qa_title > ul > li > .time {padding:0px 4px;font-size:14px;max-width:8em;vertical-align:middle;white-space:nowrap;display:inline-block;text-overflow:ellipsis;overflow:hidden;}
-  /*.qa_title > ul > li > .text {padding-left:1em;}*/
+  .qa_title > ul > li > .time {padding:0px 4px;font-size:14px;max-width:11em;color:#999;vertical-align:middle;white-space:nowrap;display:inline-block;text-overflow:ellipsis;overflow:hidden;}
   .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
   .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;justify-content:flex-end;}
   .qa_title > ul > li > .attachedfile > .ico {display:inline-block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;background-image: url("./images/toolbar/file.png");}
@@ -182,12 +181,13 @@
   .messagetoico::after {content:"▸";color:#000;}
   .bd1 {border:1px solid rgb(164, 164, 164);}
   .h125 {height:125px;}
+  .del {position:absolute;top:0px;right:0px;width:10px;height:10px;z-index:10;cursor:pointer;}
 
   /* RWD */
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
     .accordionPart > section.open {width:100%;float:left;}
-    .qa_title > ul > li > .time {max-width:11em;}
+    /*.qa_title > ul > li > .time {max-width:11em;}*/
   }
 </style>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.1/vue.js"></script>
@@ -244,7 +244,6 @@
         },
         methods: {
           matchClass: function(sMsgCreater) {
-            console.log(sMsgCreater);
             return (sMsgCreater == oItem.Userid);
           },
           addremsg: function(oArg) {
@@ -394,10 +393,10 @@
                 reader.onload = function (e) {
                   $('.filebox').height('150px');
                   if (0 <= filetype.indexOf('image')) {
-                    $('.filebox').append('<li id="' + oRtn.fileid + '" class="imgupload delete"><img src="' + e.target.result + '" /></li>');
+                    $('.filebox').append('<li id="' + oRtn.fileid + '" class="delete"><span class="del">&nbsp;</span><img src="' + e.target.result + '" /></li>');
                   }
                   else {
-                    $('.filebox').append('<li id="' + oRtn.fileid + '" class="fileupload bd1 h125 delete"><div><img src="./images/toolbar/file.png" /><span>' + filename + '</span></div></li>');
+                    $('.filebox').append('<li id="' + oRtn.fileid + '" class="fileupload bd1 h125 delete"><span class="del">&nbsp;</span><div><img src="./images/toolbar/file.png" /><span>' + filename + '</span></div></li>');
                   }
                   $grid.masonry('reloadItems');
                   $grid.masonry('layout');
@@ -414,20 +413,26 @@
         });
       })
 
-      // 刪除 圖片/檔案
-      $('body').on('click', '.filebox > li', function (e) {
-        var sX = $(this).position().left;
-        var sY = $(this).position().top;
-        if (196 <= (e.pageX - sX) && 306 >= (e.pageY - sY) && $(e.target).is('li')) {
+      // 刪除 圖片/檔案/留言
+      $('body').on('click', 'del', function (e) {
 
-          sDelFile += '[' + $(e.target).attr('id') + ']';
-          e.target.remove();
+        // 刪除 圖片/檔案
+        if ($(e.target).parent().is('li')) {
+          sDelFile += '[' + $(e.target).parent().attr('id') + ']';
+          $(e.target).parent().remove();
+
           // 如果沒有檔案, 畫面縮小
           if (0 === $('.filebox').children().length) {
             $('.filebox').height('0px');
             $grid.masonry('reloadItems');
             $grid.masonry('layout');
           }
+        }
+
+        // 刪除留言
+        console.log($(e.target));
+        if ($(e.target).parent().is('section')) {
+          console.log(123123);
         }
       });
 
@@ -450,7 +455,7 @@
       // 打開留言
 			$grid.on('click','.grid-item', function(e) {
         if ($(e.target).is('textarea') || $(e.target).closest('div').hasClass('qa_content') ||
-            $(e.target).parent().hasClass('filename') || $(e.target).is('button')) {
+            $(e.target).parent().hasClass('filename') || $(e.target).is('button') || $(e.target).hasClass('del')) {
           return;
         }
 
@@ -498,6 +503,7 @@
 						</section>
             <div id="msg_content" style="display:none;">
               <section v-for="(item, index) in Message" class="grid-item">
+                <span class="del">&nbsp;</span>
                 <div v-bind:id="index" class="qa_title" v-bind:class="[matchClass(item.create_userid) ? 'delete' : '']">
   								<ul>
   									<li><span class="name">{{item.create_user}}<span class="messagetoico"></span>{{item.touser_name}}</span><span class="time">{{item.create_time}}</span></li>

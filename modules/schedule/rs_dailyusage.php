@@ -127,7 +127,7 @@ file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').
 file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Query LearningStat...'.PHP_EOL, FILE_APPEND);
   $vReportData = getLearningStat($vReportData, $sSemeYear);
 
-file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Insert report_dailyusage...'.PHP_EOL, FILE_APPEND);
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Start Insert report_dailyusage 共 '.count($vReportData).' 筆資料...'.PHP_EOL, FILE_APPEND);
   $sSQLUsage = $dbh->prepare("INSERT INTO
     report_dailyusage (sn, organization_id, city_name, postcode, city_area, name, exam_total, video_watching_total, video_spend_time, exercise_total, node, datetime_log)
     VALUES (NULL, :organization_id, :city_name, :postcode,:city_area, :name, :exam_total, :video_watching_total, :video_spend_time, :exercise_total, :node, :datetime_log)");
