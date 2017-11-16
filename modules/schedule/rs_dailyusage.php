@@ -1,7 +1,7 @@
 <?php
-require_once('../../include/config.php');
-require_once('../../include/adp_API.php');
-require_once('../../include/ref_cityarea.php');
+require_once('./include/config.php');
+require_once('./include/adp_API.php');
+require_once('./include/ref_cityarea.php');
 
 $sSemeYear = getYearSeme();
 
@@ -13,8 +13,12 @@ function createReport_dailyusage($sSemeYear) {
    $oReport = $dbh->prepare("SELECT organization_id FROM report_dailyusage WHERE datetime_log LIKE '".date('Y-m-d')."%'") ;
    $oReport->execute();
    $iReprotCount = $oReport->rowCount();
-   if (0 < $iReprotCount) return;
+   if (0 < $iReprotCount) {
+     file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : 今天已經執行過報表'.PHP_EOL, FILE_APPEND);
+     return;
+   }
 
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : 正在查詢影片瀏覽人數...'.PHP_EOL, FILE_APPEND);
   // 影片瀏覽人數
   $sSQLVideo = 'SELECT organization.organization_id, city.city_name, organization.name, SUBSTR(organization.address,2,3) postcode, COUNT(video_review_record.user_id) num
     FROM user_info,	(SELECT * FROM video_review_record GROUP BY user_id) video_review_record, organization, city ,user_status
@@ -29,6 +33,7 @@ function createReport_dailyusage($sSemeYear) {
   $oVideo->execute();
   $vVideoData= $oVideo->fetchAll(\PDO::FETCH_ASSOC);
 
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : 正在查詢影片瀏覽時間...'.PHP_EOL, FILE_APPEND);
   // 影片瀏覽時間
   $sSQLSpentTime='SELECT organization.organization_id, city.city_name, organization.name, SUBSTR(organization.address,2,3) postcode, SUM(total_time) total_sec
     FROM user_info,	(SELECT * FROM video_review_record GROUP BY user_id) video_review_record, organization, city ,user_status
@@ -43,6 +48,7 @@ function createReport_dailyusage($sSemeYear) {
   $oSpentTime->execute();
   $vSpentTimeData = $oSpentTime->fetchAll(\PDO::FETCH_ASSOC);
 
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : 正在查詢練習題人數...'.PHP_EOL, FILE_APPEND);
   //練習題人數 5
   $sSQLPrac = 'SELECT organization.organization_id, city.city_name, organization.name, SUBSTR(organization.address,2,3) postcode, COUNT(DISTINCT prac_answer.user_id) num
     FROM user_info, prac_answer, organization, city
@@ -55,6 +61,7 @@ function createReport_dailyusage($sSemeYear) {
   $oPrac->execute();
   $vPracData = $oPrac->fetchAll(\PDO::FETCH_ASSOC);
 
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Create View Table...'.PHP_EOL, FILE_APPEND);
   // Create View
   $sSQLExam = 'CREATE VIEW EXAM_VIEW AS
     SELECT organization.organization_id, city.city_name, organization.name, COUNT(DISTINCT exam_record.user_id) num, SUBSTR(organization.address,2,3) postcode
@@ -74,6 +81,7 @@ function createReport_dailyusage($sSemeYear) {
   $oExam = $dbh->prepare($sSQLExam);
   $oExam->execute();
 
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Query View Table...'.PHP_EOL, FILE_APPEND);
   $sSQLExamView = 'SELECT organization_id, city_name, postcode, name, SUM(num) num FROM EXAM_VIEW GROUP BY organization_id';
   $oExamView = $dbh->prepare($sSQLExamView);
   $oExamView->execute();
@@ -82,6 +90,7 @@ function createReport_dailyusage($sSemeYear) {
   $oExamView = $dbh->prepare('DROP VIEW EXAM_VIEW');
   $oExamView -> execute();
 
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Data Handling...'.PHP_EOL, FILE_APPEND);
   $vReportData = array();
   // 影片瀏覽人數
   foreach ($vVideoData as $sCol => $tmpVideo) {
@@ -115,8 +124,10 @@ function createReport_dailyusage($sSemeYear) {
   	$vReportData[$tmpExam['organization_id']]['exam_total'] = $tmpExam['num'];
   }
 
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Query LearningStat...'.PHP_EOL, FILE_APPEND);
   $vReportData = getLearningStat($vReportData, $sSemeYear);
 
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Insert report_dailyusage...'.PHP_EOL, FILE_APPEND);
   $sSQLUsage = $dbh->prepare("INSERT INTO
     report_dailyusage (sn, organization_id, city_name, postcode, city_area, name, exam_total, video_watching_total, video_spend_time, exercise_total, node, datetime_log)
     VALUES (NULL, :organization_id, :city_name, :postcode,:city_area, :name, :exam_total, :video_watching_total, :video_spend_time, :exercise_total, :node, :datetime_log)");
@@ -142,6 +153,8 @@ function createReport_dailyusage($sSemeYear) {
     $sSQLUsage->bindValue(':datetime_log', date("Y-m-d H:i:s"), PDO::PARAM_STR);
   	$sSQLUsage->execute();
   }
+file_put_contents(realpath('./data/').'/rs_dailyusage.log', date('Y-m-d H:i:s').' : Finish report_dailyusage'.PHP_EOL, FILE_APPEND);
+  echo 'Finish report_dailyusage';
 }
 
 function getLearningStat($vReportData, $sSemeYear) {
