@@ -77,6 +77,7 @@
         $vNewData['msg_'.$vMsg['msg_sn']]['msg_sn'] = $vMsg['msg_sn'];
         $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = id2uname($vMsg['touser_id']);
         $vNewData['msg_'.$vMsg['msg_sn']]['create_user'] = id2uname($vMsg['create_user']);
+        $vNewData['msg_'.$vMsg['msg_sn']]['create_userid'] = $vMsg['create_user'];
         $vNewData['msg_'.$vMsg['msg_sn']]['create_time'] = substr($vMsg['create_time'], 0, 16);
         $vNewData['msg_'.$vMsg['msg_sn']]['msg_content'] = str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['msg_content']);
         $vNewData['msg_'.$vMsg['msg_sn']]['attachefile'] = $vMsg['attachefile'];
@@ -125,12 +126,13 @@
   .filebox::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
 
   /* 留言浮動框 */
-  .grid-item {margin-bottom:5px;}
+  .grid-item {margin-bottom:5px;height:250;}
   .accordionPart > section {border:solid 1px #E3E3E3;}
   .accordionPart > section.grid-item {width:320px;float:left;}
   .accordionPart > section.open {width:100%;float:left;}
   .accordionPart > section.open > div.qa_content {display:inherit !important;background-color:#f6f7f9;}
-  .accordionPart > section > div.qa_title {cursor: pointer;}
+  .accordionPart > section > div.qa_title {cursor:pointer;position:relative;}
+  .accordionPart > section > div.delete::after {content:"";position:absolute;top:0px;right:0px;width:10px;height:10px;background-image: url("./images/toolbar/del.png");background-size:100%;background-position:center;background-repeat:no-repeat;}
   .accordionPart > section > div.qa_content {display:none;}
 
   /* 留言標題 */
@@ -148,7 +150,8 @@
   /* 留言回覆 */
   .qa_content > ul > li > .name {color:rgb(0, 0, 255);}
   .qa_content > ul > li > .time {font-size:14px;color:rgb(157, 157, 157);}
-  .qa_content .input-group textarea {height: 38px !important;overflow: hidden !important;}
+  .qa_content .input-group textarea {z-index:0 !important;height: 38px !important;overflow: hidden !important;}
+  .qa_content .input-group button {z-index:0 !important;}
 
   /* 留言給家長 */
   .stamp {display:block;max-width:1150px;margin-bottom:4px;overflow-y:auto;background-color:#F8F8F8;}
@@ -240,7 +243,9 @@
           $grid.prepend(oMsgQuestion).masonry('prepended', oMsgQuestion);
         },
         methods: {
-          addMessage: function() {
+          matchClass: function(sMsgCreater) {
+            console.log(sMsgCreater);
+            return (sMsgCreater == oItem.Userid);
           },
           addremsg: function(oArg) {
             console.log(oArg);
@@ -493,7 +498,7 @@
 						</section>
             <div id="msg_content" style="display:none;">
               <section v-for="(item, index) in Message" class="grid-item">
-                <div v-bind:id="index" class="qa_title">
+                <div v-bind:id="index" class="qa_title" v-bind:class="[matchClass(item.create_userid) ? 'delete' : '']">
   								<ul>
   									<li><span class="name">{{item.create_user}}<span class="messagetoico"></span>{{item.touser_name}}</span><span class="time">{{item.create_time}}</span></li>
   									<li>
