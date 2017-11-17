@@ -281,6 +281,7 @@
       // 送出留言
       $('#sumbit_btn').click(function() {
         var oMessage = {
+          upload: 'INSERT'
           attachefile: ($('.filebox').children().length > 0) ? '1': '0',
           create_user: oItem.Userid,
           delete_flag: '0',
@@ -432,6 +433,30 @@
         // 刪除留言
         if ($(e.target).parent().is('section')) {
           var sDelIndex = $(e.target).next().attr('id');
+          sDelIndex = sDelIndex.substr(sDelIndex.indexOf('_') + 1);
+
+          var oDelMessage = {
+            upload: 'DELETE'
+            messageid: sDelIndex
+          };
+
+          $.ajax({
+              url: './modules/message/uploadmessage.php',
+              data: oDelMessage,
+              method: "POST",
+              success: function (sRtn) {
+                var oRtn = JSON.parse(sRtn);
+                if ('SUCCESS' === oRtn.STATUS) {
+                  location.reload();
+                }
+                else {
+                  alert(oRtn.MSG);
+                }
+              },
+              error: function (jqXHR, textStatus, errorMessage) {
+                alert('伺服器連線不穩定，請稍後再試!');
+              }
+          });
         }
       });
 
