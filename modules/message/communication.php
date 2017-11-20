@@ -8,32 +8,91 @@
 
   // 取得 user 資料
   $vUserData = get_object_vars($_SESSION['user_data']);
-  $sUserID = $vUserData['user_id'];
 
-  $vToParent = getParents($vUserData['grade'], $vUserData['class_name']);
-  $vMessageData = getMessage($sUserID);
+  $vParentGroup = array();
+  $vParentGroup = getGroup();
+
+  $vTo = array();
+  $vTo = getMessagetoWHO();
+
+  $vMessageData = array();
+  $vMessageData = getMessage();
   $vMessageData = handleData($vMessageData);
+  $sButtonLable = ('11' == $vUserData['access_level']) ? '留言給老師' : '留言給家長';
 
   // 整理資料, 統一變數傳至HTML
-  $sJSOject = arraytoJS(array('Userid' => $sUserID,
+  $sJSOject = arraytoJS(array('Userid' => $vUserData['user_id'],
                               'Message' => $vMessageData));
 
-  function getMessage($sUserID) {
-    global $dbh;
+  // function
+  function getGroup() {
+    global $dbh, $vUserData;
 
+    $sACL = $vUserData['access_level'];
+
+    switch($sACL) {
+      case '11':  // 家長身分
+        $sUserID = $vUserData['user_id'];
+
+        $sSQLParentInfo = "SELECT * FROM user_family
+          LEFT JOIN user_info ON user_family.user_id = user_info.user_id
+          WHERE user_family.fuser_id = '$sUserID'";
+
+        $oSQLParentInfo = $dbh->prepare($sSQLParentInfo);
+        $oSQLParentInfo->execute();
+        $vParentInfo = $oSQLParentInfo->fetchAll(\PDO::FETCH_ASSOC);
+
+        $vParentGroup = array();
+        foreach ($vParentInfo as $vInfo) {
+          // $vParentGroup['info'] 家長發送的訊息對象
+          $vParentGroup['info'][] = array('organization_id' => $vInfo['organization_id'],
+                                        'grade' => $vInfo['grade'],
+                                        'class' => $vInfo['class']);
+          $vParentGroup['togroup'][] = '['.$vInfo['organization_id'].']'.'['.$vInfo['grade'].']'.'['.$vInfo['class'].']';
+        }
+        break;
+
+      case '21':
+        $sOrganizeID = $vUserData['organization_id'];
+        $sGrade = $vUserData['grade'];
+        $sClass = $vUserData['class_name'];
+
+        $vParentGroup['togroup'][] = '['.$sOrganizeID.']'.'['.$sGrade.']'.'['.$sClass.']';
+        break;
+    }
+
+    return $vParentGroup;
+  }
+
+  function getMessage() {
+    global $dbh, $vUserData, $vParentGroup;
+
+    $vMessageData = array();
+    $sUserID = $vUserData['user_id'];
+
+    $sSQLParentGroup = '';
+    if (!empty($vParentGroup['togroup'])) {
+      foreach ($vParentGroup['togroup'] as $sGroupStr) {
+        $sSQLParentGroup .= " OR message_master.togroup LIKE '%$sGroupStr%' ";
+      }
+    }
     $sSQLMessage = "SELECT * FROM message_master
       LEFT JOIN message_response ON message_master.msg_sn = message_response.message_sn
       LEFT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
       AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+      $sSQLParentGroup
       UNION
       SELECT * FROM message_master
       RIGHT JOIN message_response ON message_master.msg_sn = message_response.message_sn
       RIGHT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
-      AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID') ORDER BY msg_sn DESC";
+      AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+      $sSQLParentGroup
+      ORDER BY msg_sn DESC";
+      // echo $sSQLMessage;
     $oMessage = $dbh->prepare($sSQLMessage);
     $oMessage->execute();
     $vMessageData = $oMessage->fetchAll(\PDO::FETCH_ASSOC);
@@ -41,70 +100,156 @@
     return $vMessageData;
   }
 
-  function getParents($sGroup, $sClass) {
-    global $dbh;
+  function getMessagetoWHO() {
+    global $dbh, $vUserData, $vParentGroup;
 
-    $sSQLParents = "SELECT user_info.user_id, user_family.fuser_id FROM user_info
-      LEFT JOIN user_family ON user_info.user_id = user_family.user_id
-      WHERE user_info.grade = '6'
-      AND user_info.class = '9'
-      AND user_info.user_id LIKE '%ss%'
-      AND LENGTH(user_family.user_id) > 4";
-    $oParents = $dbh->prepare($sSQLParents);
-    $oParents->execute();
-    $vParentsData = $oParents->fetchAll(\PDO::FETCH_ASSOC);
+    $vTo = array();
+    $sACL = $vUserData['access_level'];
 
-    if (!empty($vParentsData) && is_array($vParentsData)) {
-      $vToParent = array();
-      $vToParent[] = '<select id="sel_parent">';
-      $vToParent[] =   '<option value="">全部家長</option>';
-      foreach($vParentsData as $vParent) {
-        $sStudentName = id2uname($vParent['user_id']);
-        $vToParent[] = '<option value="'.$vParent['fuser_id'].'">'.$sStudentName.'  家長</option>';
+    switch($sACL) {
+      // Parents to Teacher
+      case '11':
+        $sTitle = '';
+        $vGrade = array();
+        $vClass = array();
+        $vOrganizeID = array();
+        foreach ($vParentGroup['info'] as $vPGroup) {
+          $vOrganizeID[] = $vPGroup['organization_id'];
+          $vGrade[] = $vPGroup['grade'];
+          $vClass[] = $vPGroup['class'];
+        }
+        $sOrganizeID = implode("','", $vOrganizeID);
+        $sGrade = implode("','", $vGrade);
+        $sClass = implode("','", $vClass);
+
+        $sParentGroup = implode(",", $vParentGroup['togroup']);
+        $sToAll = $sParentGroup.'>>>ALL';
+        $sSQLTO = "SELECT *, user_id, user_id as towho FROM user_info
+          WHERE organization_id IN ('$sOrganizeID')
+          AND grade IN ('$sGrade')
+          AND class IN ('$sClass')
+          AND user_id LIKE '%-t%'
+          AND used = '1'";
+        break;
+
+      // Teacher to Parents
+      case '21':
+        $sTitle = '家長'; // 給家長
+        $sGrade = $vUserData['grade'];
+        $sClass = $vUserData['class_name'];
+        $sSchool = $vUserData['organization_id'];
+        $sToAll = "[$sSchool][$sGrade][$sClass]>>>ALL";
+        $sSQLTO = "SELECT user_info.user_id, user_family.fuser_id as towho FROM user_info
+          LEFT JOIN user_family ON user_info.user_id = user_family.user_id
+          WHERE user_info.grade = $sGrade
+          AND user_info.organization_id = $sSchool
+          AND user_info.class = $sClass
+          AND user_info.used = '1'
+          AND LENGTH(user_family.user_id) > 4
+          GROUP by user_info.user_id";
+        break;
+    }
+    // echo $sSQLTO;
+    $oTO = $dbh->prepare($sSQLTO);
+    $oTO->execute();
+    $vTOWHO = $oTO->fetchAll(\PDO::FETCH_ASSOC);
+
+    if (!empty($vTOWHO) && is_array($vTOWHO)) {
+      $vTo = array();
+      $vTo[] = '<select id="sel_parent">';
+      $vTo[] =   '<option value="'.base64_encode($sToAll).'">全部</option>';
+      foreach($vTOWHO as $vWHO) {
+        $sToName = id2uname($vWHO['user_id']);
+        $vTo[] = '<option value="'.base64_encode($vWHO['towho']).'">'.$sToName.' '. $sTitle.'</option>';
       }
-      $vToParent[] = '</select>';
+      $vTo[] = '</select>';
     }
 
-    return $vToParent;
+    return $vTo;
   }
 
   function handleData($vMessageData) {
-    global $sUserID;
+    global $vUserData;
+
+    $sUserID = $vUserData['user_id'];
+    $sACL = $vUserData['access_level'];
 
     $vNewData = array();
     foreach ($vMessageData as $key => $vMsg) {
+      // 因為資料集是UNION起來，所以要去除重複的編號
       if (!isset($vNewData['msg_'.$vMsg['msg_sn']])) {
+        $time1 = date("Y-m-d H:i:s");
+        $time2 = substr($vMsg['create_time'], 0, 16);
+        $sCreateTime = '';
+        if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60*60*24))) {
+          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60*60*24)).'日';
+        }
+        else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60*60))) {
+          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60*60)).'小時';
+        }
+        else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60))) {
+          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60)).'分';
+        }
+        else if (59 <= floor((strtotime($time1) - strtotime($time2)))) {
+          $sCreateTime = floor((strtotime($time1) - strtotime($time2))).'秒';
+        }
         $vNewData['msg_'.$vMsg['msg_sn']]['msg_sn'] = $vMsg['msg_sn'];
         $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = id2uname($vMsg['touser_id']);
         $vNewData['msg_'.$vMsg['msg_sn']]['create_user'] = id2uname($vMsg['create_user']);
         $vNewData['msg_'.$vMsg['msg_sn']]['create_userid'] = $vMsg['create_user'];
-        $vNewData['msg_'.$vMsg['msg_sn']]['create_time'] = substr($vMsg['create_time'], 0, 16);
+        $vNewData['msg_'.$vMsg['msg_sn']]['create_time'] = $sCreateTime;
         $vNewData['msg_'.$vMsg['msg_sn']]['msg_content'] = str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['msg_content']);
         $vNewData['msg_'.$vMsg['msg_sn']]['attachefile'] = $vMsg['attachefile'];
         $vNewData['msg_'.$vMsg['msg_sn']]['read_mk'] = $vMsg['read_mk'];
         $vNewData['msg_'.$vMsg['msg_sn']]['delete_flag'] = $vMsg['delete_flag'];
         $vNewData['msg_'.$vMsg['msg_sn']]['response_total'] = 0;
+
+        // 群發訊息 touser_id 會是NULL
+        if (empty($vMsg['touser_id']) && !empty($vMsg['togroup'])) {
+          if ($sUserID !== $vMsg['create_user']) {
+            $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = id2uname($vMsg['create_user']);
+          }
+          else {
+            $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = ('11' == $sACL)? '全部老師' : '全班家長';
+          }
+        }
       }
       if (isset($vMsg['file_sn'])) {
         switch($vMsg['filetype']) {
           case 'image':
-            $vNewData['msg_'.$vMsg['msg_sn']]['msgimg'][$vMsg['file_sn']] = array('filesrc' => './data/message/'.$sUserID.'/'.$vMsg['file_replacename']);
+            $vNewData['msg_'.$vMsg['msg_sn']]['msgimg'][$vMsg['file_sn']] = array('filesrc' => $vMsg['filesrc']);
             break;
 
           default:
             $vNewData['msg_'.$vMsg['msg_sn']]['msgfile'][$vMsg['file_sn']] = array('file_orgnialname' => $vMsg['file_orgnialname'],
                                                                                    'file_replacename' => $vMsg['file_replacename'],
                                                                                    'upload_time' => substr($vMsg['upload_time'], 0, 16),
-                                                                                   'filesrc' => './data/message/'.$sUserID.'/'.$vMsg['file_replacename']);
+                                                                                   'filesrc' => $vMsg['filesrc']);
             break;
         }
       }
       if ($vMsg['response_sn']) {
+        // if ('21' == $sACL && $sUserID != $vMsg['remsg_create_user']) continue;
+        $time1 = date("Y-m-d H:i:s");
+        $time2 = substr($vMsg['remsg_create_time'], 0, 16);
+        $sCreateTime = '';
+        if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60*60*24))) {
+          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60*60*24)).'日';
+        }
+        else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60*60))) {
+          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60*60)).'小時';
+        }
+        else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60))) {
+          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60)).'分';
+        }
+        else if (59 <= floor((strtotime($time1) - strtotime($time2)))) {
+          $sCreateTime = floor((strtotime($time1) - strtotime($time2))).'秒';
+        }
         $vNewData['msg_'.$vMsg['msg_sn']]['response_total']++;
         $vNewData['msg_'.$vMsg['msg_sn']]['remsgindex'] = $vMsg['response_sn'];
         $vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['response_content']),
                                                                                  'remsg_create_user' => id2uname($vMsg['remsg_create_user']),
-                                                                                 'remsg_create_time' => substr($vMsg['remsg_create_time'], 0, 16));
+                                                                                 'remsg_create_time' => $sCreateTime);
       }
     }
     return $vNewData;
@@ -138,7 +283,7 @@
   /* 留言標題 */
   .qa_title > ul > li {position:relative;overflow:hidden;}
   .qa_title > ul > li > .name {color:rgb(0, 0, 255);}
-  .qa_title > ul > li > .time {padding:0px 4px;font-size:14px;max-width:11em;color:#999;vertical-align:middle;white-space:nowrap;display:inline-block;text-overflow:ellipsis;overflow:hidden;}
+  .qa_title > ul > li > .time {padding:0px 4px;margin-bottom:5px;font-size:14px;max-width:11em;color:#999;vertical-align:middle;white-space:nowrap;display:inline-block;text-overflow:ellipsis;overflow:hidden;}
   .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
   .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;justify-content:flex-end;}
   .qa_title > ul > li > .attachedfile > .ico {display:inline-block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;background-image: url("./images/toolbar/file.png");}
@@ -167,7 +312,7 @@
   .toolbar > li > i:hover {background-color:#E7E7E7;border:1px solid #999;}
   .toolbar > li > i.pic {background-image: url("./images/toolbar/picture.png");}
   .toolbar > li > i.file {opacity:0.6;background-image: url("./images/toolbar/addfile.png");}
-  .toolbar > li.messageto > select {height:28px;margin-top:5px;}
+  .toolbar > li.messageto > select {height:28px;line-height:21px;}
 
   /* 留言上傳檔案 */
   .filebox {display:block;overflow:hidden;overflow-x:auto;white-space:nowrap;}
@@ -187,7 +332,6 @@
   @media screen and (min-width: 500px) {
     .accordionPart > section.grid-item {width:380px;float:left;}
     .accordionPart > section.open {width:100%;float:left;}
-    /*.qa_title > ul > li > .time {max-width:11em;}*/
   }
 </style>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.1/vue.js"></script>
@@ -206,6 +350,9 @@
 		$.LoadingOverlay('show');
 
 		$(document).ready(function() {
+      if (oItem.level)
+      $('#stamp_btn').html()
+
       // masonry
       var $grid = $('.grid').masonry({
 			  itemSelector: '.grid-item',
@@ -241,6 +388,9 @@
         mounted: function () {
           var oMsgQuestion = $('.grid-item');
           $grid.prepend(oMsgQuestion).masonry('prepended', oMsgQuestion);
+          $grid.masonry();
+          $.LoadingOverlay('hide');
+          $('#msg_content').css('display', '');
         },
         methods: {
           matchClass: function(sMsgCreater) {
@@ -280,8 +430,13 @@
 
       // 送出留言
       $('#sumbit_btn').click(function() {
+        if (!$('#sel_parent').val()) {
+          alert('留言失敗，沒有送的對象!');
+          return;
+        }
+
         var oMessage = {
-          upload: 'INSERT'
+          upload: 'INS',
           attachefile: ($('.filebox').children().length > 0) ? '1': '0',
           create_user: oItem.Userid,
           delete_flag: '0',
@@ -291,6 +446,10 @@
           deletefile: sDelFile
         };
 
+        if ('' == oMessage.msg_content && '0' == oMessage.attachefile) {
+          alert('留言失敗，沒有內容!');
+          return;
+        }
         $.ajax({
             url: './modules/message/uploadmessage.php',
             data: oMessage,
@@ -432,11 +591,14 @@
 
         // 刪除留言
         if ($(e.target).parent().is('section')) {
+          var bSureDelete = confirm("確定要刪除訊息?\n留言和附檔都會一併被刪除。");
+          if (bSureDelete != true) return;
+
           var sDelIndex = $(e.target).next().attr('id');
           sDelIndex = sDelIndex.substr(sDelIndex.indexOf('_') + 1);
 
           var oDelMessage = {
-            upload: 'DELETE'
+            upload: 'DEL',
             messageid: sDelIndex
           };
 
@@ -493,10 +655,6 @@
           }
         });
 			});
-
-      $grid.masonry();
-      $.LoadingOverlay('hide');
-      $('#msg_content').css('display', '');
   });
 });
 
@@ -510,14 +668,14 @@
           </ul>
    		 </div>
  			<div class="right-box" style="width:100%;margin:0px auto;">
-        <button class="btn06 stamp-button" style="width:120px;">留言給家長</button>
+        <button id="stamp_btn" class="btn06 stamp-button" style="width:120px;"><?php echo $sButtonLable; ?></button>
         <article class="main_content">
           <div class="accordionPart grid">
 						<section class="stamp">
               <ul class="toolbar">
                 <li>留言<span class="messagetoico"></span></li>
                 <li class="messageto">
-<?php echo implode('', $vToParent); ?>
+<?php echo implode('', $vTo); ?>
                 </li>
                 <li><i class="file" title="上傳圖片/檔案"><input id="uplodefile" type="file" value="" /></i></li>
               </ul>
@@ -554,6 +712,8 @@
                       <span class="name">{{oReMsg.remsg_create_user}}</span>
                       <span class="text" v-html="oReMsg.response_content"></span>
                       <span class="time">{{oReMsg.remsg_create_time}}</span>
+                      <span class="time"><ins id="res_resmsg">回覆</ins></span>
+                      <span class="time"><ins id="res_delmsg">刪除</ins></span>
                     </li>
                   </ul>
                   <div class="input-group" style="padding:4px;">
