@@ -361,6 +361,8 @@
       var $grid = $('.grid').masonry({
 			  itemSelector: '.grid-item',
 			  columnWidth: $('#grid-item').width(),
+        horizontalOrder: true,
+        fitWidth: true,
 				gutter: 5
 			});
 
@@ -392,7 +394,8 @@
         mounted: function () {
           var oMsgQuestion = $('.grid-item');
           $grid.prepend(oMsgQuestion).masonry('prepended', oMsgQuestion);
-          $grid.masonry();
+          $grid.masonry('reloadItems');
+          $grid.masonry('layout');
           $.LoadingOverlay('hide');
           $('#msg_content').css('display', '');
         },
@@ -452,7 +455,7 @@
           deletefile: sDelFile
         };
 
-        if ('' == oMessage.msg_content && '0' == oMessage.attachefile) {
+        if ('' != oMessage.msg_content && '0' == oMessage.attachefile) {
           alert('留言失敗，沒有內容!');
           return;
         }
@@ -521,10 +524,32 @@
         });
       });
 
+      // 回覆留言的訊息
       $('.qa_content > ul > li > .resmsg').click(function (e) {
-        console.log('res');
+        var sIndex,sName;
+        $(e.target).parents().map(function () {
+          if ('qa_content' === $(this).attr('class')) {
+            sIndex = $(this).prev().attr('id');
+            sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
+          }
+        });
+
+        $(e.target).parent().prevAll().map(function (e) {
+          if ('name' === $(this).attr('class')) {
+            sName = $(this).html();
+          }
+        });
+
+        var oResponse = {
+          message_sn: sIndex,
+          remsg_create_user: oItem.Userid,
+          response_content: $('#response_textmsg_' + sIndex).val(),
+          remsg_delete_flag: '0'
+        };
+
       });
 
+      // 刪除回覆的留言
       $('.qa_content > ul > li > .delmsg').click(function (e) {
         console.log('delmsg');
       });
