@@ -39,11 +39,15 @@
     default:
       $vRtn['STATUS'] = 'ERR';
       $vRtn['MSG'] = '錯誤代碼: MD_MSG_UFx041';
+
+      echo json_encode($vRtn);
+      exit();
       break;
   }
 
   $sTimeSatmp = microtime(true);
   $sFileName = $_SESSION['user_id'].'_'.str_replace('.', '_', $sTimeSatmp).'_'.$_FILES['import_file']['name'];
+  $sFileSrc = './data/message/'.$sUserID.'/'.$sFileName;
 
   // !!
   $_SESSION['message']['uploadfile'][] = array('name' => $sFileName,
@@ -51,9 +55,10 @@
 
   if ('SUCCESS' === $vRtn['STATUS'] && move_uploaded_file($_FILES['import_file']['tmp_name'], '../../tmp/'.$sFileName)) {
     $oSQLUploadfile = $dbh->prepare("INSERT INTO message_fileattached
-       (file_sn, message_sn, file_orgnialname, file_replacename, filetype, filesize, upload_userid, upload_time) VALUES (NULL, NULL, :file_orgnialname, :file_replacename, :filetype, :filesize, :upload_userid, :upload_time)");
+       (file_sn, message_sn, file_orgnialname, file_replacename, filesrc, filetype, filesize, upload_userid, upload_time) VALUES (NULL, NULL, :file_orgnialname, :file_replacename, :filesrc, :filetype, :filesize, :upload_userid, :upload_time)");
   	$oSQLUploadfile->bindValue(':file_orgnialname', $_FILES['import_file']['name'], PDO::PARAM_STR);
     $oSQLUploadfile->bindValue(':file_replacename', $sFileName, PDO::PARAM_STR);
+    $oSQLUploadfile->bindValue(':filesrc', $sFileSrc, PDO::PARAM_STR);
   	$oSQLUploadfile->bindValue(':filetype', $sFileType, PDO::PARAM_STR);
   	$oSQLUploadfile->bindValue(':filesize', $_FILES['import_file']['size'], PDO::PARAM_STR);
     $oSQLUploadfile->bindValue(':upload_userid', $sUserID, PDO::PARAM_STR);
@@ -63,7 +68,7 @@
   }
   else {
     $vRtn['STATUS'] = 'ERR';
-    $vRtn['MSG'] = '請重新上傳，錯誤代碼: MD_MSG_UFx065';
+    $vRtn['MSG'] = '請重新上傳，錯誤代碼: MD_MSG_UFx071';
   }
 
   echo json_encode($vRtn);
