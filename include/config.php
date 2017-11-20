@@ -35,7 +35,7 @@ define('_MAINTAIN_TIME_STOP', '00:00');  //結束時間
 $SiteConfig['setMaintainTime']=1;  //啟用系統維護時間
 
 //學生作品
-define('_WORK_PATH' , _ADP_PATH.'data/work/');  
+define('_WORK_PATH' , _ADP_PATH.'data/work/');
 define('_WORK_URL' , _ADP_URL.'data/work/');
 
 //上傳檔案目錄
@@ -59,7 +59,7 @@ define('_ADP_TMP_UPLOAD_PATH' , _ADP_UPLOAD_PATH."tmp/");
 //define('_ADP_EXAM_DB_PATH' , _ADP_URL."data/CS_db/");
 define('_ADP_EXAM_DB_PATH' , "data/CS_db/");
 
-//模組預設 templates_dir 
+//模組預設 templates_dir
 define("_TEMPLATE_DIR", dirname($_SERVER['SCRIPT_FILENAME'])."/templates/");
 
 //布景主題 theme
@@ -69,6 +69,12 @@ define("_THEME_IMG", _ADP_URL._THEME."img/");
 
 //系統版本
 define("_SYS_VER", "asia");
+
+// 檔案大小
+define('FILESIZE_KB', 1024);
+define('FILESIZE_MB', 1048576);
+define('FILESIZE_GB', 1073741824);
+define('FILESIZE_TB', 1099511627776);
 
 //整個網站使用之暫存檔
 define('_SITECONFIG_PATH' , _UPLOAD_PATH."SiteConfig/");
@@ -93,8 +99,8 @@ $config['db']['password'] = $dbpass;
 
 //$dbconnect = "mysql:host=".$dbhost.";dbname=".$db_dbn;
 
-$dbh = new PDO($config['db']['dsn'], 
-				$config['db']['user'], 
+$dbh = new PDO($config['db']['dsn'],
+				$config['db']['user'],
 				$config['db']['password'],
 				array(
 					PDO::ATTR_EMULATE_PREPARES => false,
@@ -105,4 +111,3 @@ $dbh = new PDO($config['db']['dsn'],
 if (!$dbh){
 	die('config 無法連資料庫');
 }
-

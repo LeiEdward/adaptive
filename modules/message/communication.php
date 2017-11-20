@@ -249,6 +249,7 @@
         $vNewData['msg_'.$vMsg['msg_sn']]['remsgindex'] = $vMsg['response_sn'];
         $vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['response_content']),
                                                                                  'remsg_create_user' => id2uname($vMsg['remsg_create_user']),
+                                                                                 'remsg_create_userid' => $vMsg['remsg_create_user'],
                                                                                  'remsg_create_time' => $sCreateTime);
       }
     }
@@ -261,6 +262,7 @@
 <style>
   ul, li {margin:0px;padding:0px;list-style:none;}
   textarea {resize:none;}
+  ins {text-decoration: none !important;}
   .main_content {height:700px;width:100%;overflow:hidden;overflow-y:auto;}
 
   .main_content::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
@@ -293,7 +295,9 @@
 
   /* 留言回覆 */
   .qa_content > ul > li > .name {color:rgb(0, 0, 255);}
-  .qa_content > ul > li > .time {font-size:14px;color:rgb(157, 157, 157);}
+  .qa_content > ul > li > .time, .qa_content > ul > li > .resmsg, .qa_content > ul > li > .delmsg {font-size:14px;color:rgb(157, 157, 157);}
+  .qa_content > ul > li > .resmsg, .qa_content > ul > li > .delmsg {color:rgb(150, 150, 255);cursor:pointer;}
+  .qa_content > ul > li > .resmsg:active, .qa_content > ul > li > .delmsg:active {color:rgb(255, 193, 7);}
   .qa_content .input-group textarea {z-index:0 !important;height: 38px !important;overflow: hidden !important;}
   .qa_content .input-group button {z-index:0 !important;}
 
@@ -397,7 +401,6 @@
             return (sMsgCreater == oItem.Userid);
           },
           addremsg: function(oArg) {
-            console.log(oArg);
             if (0 === this.Message[oArg.index].response_total) {
               // 留言資料
               this.Message[oArg.index].remsg = Object.assign({}, this.Message[oArg.index] .remsg, {
@@ -424,6 +427,9 @@
               $grid.masonry('reloadItems');
               $grid.masonry('layout');
             })
+          },
+          showDeletresmsg: function(sArg) {
+            return (sArg === oItem.Userid);
           }
         }
       })
@@ -513,6 +519,14 @@
                 alert('伺服器連線不穩定，請稍後再試!')
             }
         });
+      });
+
+      $('.qa_content > ul > li > .resmsg').click(function (e) {
+        console.log('res');
+      });
+
+      $('.qa_content > ul > li > .delmsg').click(function (e) {
+        console.log('delmsg');
       });
 
       // 新增 檔案
@@ -712,8 +726,8 @@
                       <span class="name">{{oReMsg.remsg_create_user}}</span>
                       <span class="text" v-html="oReMsg.response_content"></span>
                       <span class="time">{{oReMsg.remsg_create_time}}</span>
-                      <span class="time"><ins id="res_resmsg">回覆</ins></span>
-                      <span class="time"><ins id="res_delmsg">刪除</ins></span>
+                      <span class="resmsg"><ins id="res_resmsg">回覆</ins></span>
+                      <span class="delmsg" v-if="showDeletresmsg(oReMsg.remsg_create_userid)"><ins id="res_delmsg">刪除</ins></span>
                     </li>
                   </ul>
                   <div class="input-group" style="padding:4px;">

@@ -60,7 +60,7 @@
     $oSQLUploadfile->bindValue(':file_replacename', $sFileName, PDO::PARAM_STR);
     $oSQLUploadfile->bindValue(':filesrc', $sFileSrc, PDO::PARAM_STR);
   	$oSQLUploadfile->bindValue(':filetype', $sFileType, PDO::PARAM_STR);
-  	$oSQLUploadfile->bindValue(':filesize', $_FILES['import_file']['size'], PDO::PARAM_STR);
+  	$oSQLUploadfile->bindValue(':filesize', round(($_FILES['import_file']['size']/FILESIZE_MB), 2), PDO::PARAM_STR);
     $oSQLUploadfile->bindValue(':upload_userid', $sUserID, PDO::PARAM_STR);
     $oSQLUploadfile->bindValue(':upload_time', date("Y-m-d H:i:s"), PDO::PARAM_STR);
   	$oSQLUploadfile->execute();
