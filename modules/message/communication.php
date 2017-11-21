@@ -207,7 +207,7 @@
         // 群發訊息 touser_id 會是NULL
         if (empty($vMsg['touser_id']) && !empty($vMsg['togroup'])) {
           if ($sUserID !== $vMsg['create_user']) {
-            $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = id2uname($vMsg['create_user']);
+            $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = id2uname($sUserID);
           }
           else {
             $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = ('11' == $sACL)? '全部老師' : '全班家長';
@@ -228,7 +228,7 @@
             break;
         }
       }
-      if ($vMsg['response_sn']) {
+      if ($vMsg['response_sn'] && !isset($vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']])) {
         // if ('21' == $sACL && $sUserID != $vMsg['remsg_create_user']) continue;
         $time1 = date("Y-m-d H:i:s");
         $time2 = substr($vMsg['remsg_create_time'], 0, 16);
@@ -250,6 +250,7 @@
         $vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['response_content']),
                                                                                  'remsg_create_user' => id2uname($vMsg['remsg_create_user']),
                                                                                  'remsg_create_userid' => $vMsg['remsg_create_user'],
+                                                                                 'res_resmsgto_user' => $vMsg['res_resmsgto_user'],
                                                                                  'remsg_create_time' => $sCreateTime);
       }
     }
@@ -273,7 +274,7 @@
   .filebox::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
 
   /* 留言浮動框 */
-  .grid-item {position:relative;margin-bottom:5px;height:250;}
+  .grid-item {position:relative;margin-bottom:10px;height:250;}
   .accordionPart > section {border:solid 1px #E3E3E3;}
   .accordionPart > section.grid-item {width:320px;float:left;}
   .accordionPart > section.open {width:100%;float:left;}
@@ -286,6 +287,7 @@
   .qa_title > ul > li {position:relative;overflow:hidden;}
   .qa_title > ul > li > .name {color:rgb(0, 0, 255);}
   .qa_title > ul > li > .time {padding:0px 4px;margin-bottom:5px;font-size:14px;max-width:11em;color:#999;vertical-align:middle;white-space:nowrap;display:inline-block;text-overflow:ellipsis;overflow:hidden;}
+  .qa_title > ul > li > span > .resmsg {color:rgb(150, 150, 255);cursor:pointer;}
   .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
   .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;justify-content:flex-end;}
   .qa_title > ul > li > .attachedfile > .ico {display:inline-block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;background-image: url("./images/toolbar/file.png");}
@@ -348,6 +350,7 @@
 <script>
   var iFileSizeLimit = 3072000; // 3M (1M = 1024000)
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
+  var oReMsg = {};
   var sDelFile = '';
 
   console.log(oItem);
@@ -360,16 +363,15 @@
       var $grid = $('.grid').masonry({
 			  itemSelector: '.grid-item',
 			  columnWidth: $('#grid-item').width(),
-        horizontalOrder: true,
-        fitWidth: true,
-				gutter: 5
+        // horizontalOrder: true,
+        // fitWidth: true,
+				gutter: 10
 			});
 
 			var $stamp = $grid.find('.stamp');
 			$stamp.hide();
 			var isStamped = false;
 			$('.stamp-button').on( 'click', function() {
-
 				// stamp or unstamp element
 			  if ( isStamped ) {
 					$stamp.hide();
@@ -386,7 +388,7 @@
         $('.main_content').scrollTop(0);
 			});
 
-      // loadimg
+      // loadIMG
       $('section > div.qatitle > ul > li > img').imagesLoaded()
         .always( function( instance ) {
           console.log('all images loaded');
@@ -445,8 +447,15 @@
               $grid.masonry('layout');
             })
           },
-          showDeletresmsg: function(sArg) {
+          showResmsg: function (sArg) {
+            return (sArg !== oItem.Userid);
+          },
+          showDeleteresmsg: function(sArg) {
             return (sArg === oItem.Userid);
+          },
+          showContent: function (sArg) {
+            var sName = sArg.match(/@[\u4e00-\u9fa5_a-zA-Z0-9]+/g);
+            return sArg.replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+/g, '<i style="color:rgb(150, 150, 255);font-size:14px;font-style: normal;">' + sName +'</i>');
           }
         }
       })
@@ -493,7 +502,7 @@
       });
 
       // 回覆留言
-      $('.qa_content > .input-group > .input-group-btn > button').click(function (e) {
+      $('.qa_content > .input-group > span.input-group-btn > #send_msg').click(function (e) {
         var sIndex;
         $(e.target).parents().map(function () {
           if ('qa_content' === $(this).attr('class')) {
@@ -501,6 +510,7 @@
             sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
           }
         });
+
         var oResponse = {
           message_sn: sIndex,
           remsg_create_user: oItem.Userid,
@@ -509,6 +519,10 @@
         };
 
         if ('' === oResponse.response_content) return;
+        if (!!oReMsg && -1 != oResponse.response_content.indexOf('@' + oReMsg.res_resmsgto_user)) {
+          oResponse.res_resmsgto_userid = oReMsg.res_resmsgto_userid;
+          oResponse.res_resmsgto_user = oReMsg.res_resmsgto_user;
+        }
 
         $.ajax({
             url: './modules/message/uploadresponse.php',
@@ -521,7 +535,9 @@
                 vueMessage.addremsg({
                   index: 'msg_' + oResponse.message_sn,
                   data: {
-                    remsg_create_time: oRtn.TIME,
+                    // remsg_create_time: 'oRtn.TIME',
+                    remsg_create_userid: oItem.Userid,
+                    remsg_create_time: '剛剛',
                     remsg_create_user: oRtn.CREATEUSER,
                     response_content: oRtn.CONTENT
                   }
@@ -538,9 +554,11 @@
         });
       });
 
-      // 回覆留言的訊息
-      $('.qa_content > ul > li > .resmsg').click(function (e) {
-        var sIndex,sName;
+      // 留言給作者本人
+      $('.qa_content > .input-group > span.input-group-btn > #toAuth').click(function (e) {
+        var sIndex, sRemsgIndex, sName, sRemsgUid;
+        $(e.target).toggleClass("btn-primary");
+
         $(e.target).parents().map(function () {
           if ('qa_content' === $(this).attr('class')) {
             sIndex = $(this).prev().attr('id');
@@ -548,19 +566,65 @@
           }
         });
 
-        $(e.target).parent().prevAll().map(function (e) {
-          if ('name' === $(this).attr('class')) {
-            sName = $(this).html();
+        sRemsgUid = oItem.Message['msg_'+ sIndex].create_userid;
+        sName = oItem.Message['msg_'+ sIndex].create_user;
+
+        $('#response_textmsg_' + sIndex).focus();
+        if (-1 == $('#response_textmsg_' + sIndex).val().indexOf('@'+ sName + ' ')) {
+          insertAtCursor($('#response_textmsg_' + sIndex)[0], '@'+ sName + ' ');
+          oReMsg = {
+            message_sn: sIndex,
+            remsg_create_user: oItem.Userid,
+            res_resmsgto_userid: sRemsgUid,
+            res_resmsgto_user: sName,
+            response_content: $('#response_textmsg_' + sIndex).val(),
+            remsg_delete_flag: '0'
+          };
+        }
+        else {
+          $('#response_textmsg_' + sIndex).val($('#response_textmsg_' + sIndex).val().replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+ /g, ''));
+        }
+      });
+
+      // 回覆留言的訊息
+      $('.qa_content > ul > li > .resmsg').click(function (e) {
+        var sIndex, sName, sRemsgUid;
+        $(e.target).parents().map(function () {
+          if ('qa_content' === $(this).attr('class')) {
+            sIndex = $(this).prev().attr('id');
+            sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
+            return;
           }
         });
 
-        var oResponse = {
+        var sRemsgIndex = $(e.target).parent().parent().attr('id');
+        sRemsgIndex = sRemsgIndex.substr(sRemsgIndex.indexOf('_') + 1);
+        sRemsgUid = '';
+        if (!!oItem.Message['msg_'+ sIndex].remsg[sRemsgIndex].remsg_create_userid) {
+          sRemsgUid = oItem.Message['msg_'+ sIndex].remsg[sRemsgIndex].remsg_create_userid;
+        }
+
+        $(e.target).parent().prevAll().map(function (e) {
+          if ('name' === $(this).attr('class')) {
+            sName = $(this).html();
+            return;
+          }
+        });
+        $('#response_textmsg_' + sIndex).focus();
+        if (-1 == $('#response_textmsg_' + sIndex).val().indexOf( '@'+ sName + ' ')) {
+          insertAtCursor($('#response_textmsg_' + sIndex)[0], '@'+ sName + ' ');
+        }
+
+        oReMsg = {
           message_sn: sIndex,
           remsg_create_user: oItem.Userid,
+          res_resmsgto_userid: sRemsgUid,
+          res_resmsgto_user: sName,
           response_content: $('#response_textmsg_' + sIndex).val(),
           remsg_delete_flag: '0'
         };
       });
+
 
       // 刪除回覆的留言
       $('.qa_content > ul > li > .delmsg').click(function (e) {
@@ -700,15 +764,39 @@
 				$(this).toggleClass('open');
 			  $grid.masonry('reloadItems');
 			  $grid.masonry('layout');
-
         $(e.target).parents().map(function () {
-          if ('qa_title' === $(this).attr('class')) {
-            window.location.href = '#' + $(this).attr('id');
+          if ('qa_title' === $(this).attr('class') || 'qa_title delete' === $(this).attr('class')) {
+            sIndex = $(this).attr('id');
+            sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
+            $('#response_textmsg_' + sIndex).focus();
           }
         });
 			});
   });
 });
+
+function insertAtCursor(myField, myValue) {
+  if ('@undefined' == myValue) return;
+
+    //IE support
+    if (document.selection) {
+        myField.focus();
+        sel = document.selection.createRange();
+        sel.text = myValue;
+    }
+    //MOZILLA and others
+    else if (myField.selectionStart || myField.selectionStart == '0') {
+        var startPos = myField.selectionStart;
+        var endPos = myField.selectionEnd;
+        myField.value = myValue
+          + myField.value.substring(0, startPos)
+          + myField.value.substring(endPos, myField.value.length);
+        myField.selectionStart = startPos + myValue.length;
+        myField.selectionEnd = startPos + myValue.length;
+    } else {
+        myField.value += myValue;
+    }
+}
 
 </script>
   <div class="content2-Box">
@@ -759,19 +847,22 @@
   								</ul>
   							</div>
                 <div class="qa_content">
-                  <ul v-for="oReMsg in item.remsg">
-                    <li>
+                  <ul v-for="(oReMsg, index) in item.remsg">
+                    <li v-bind:id="'resmsg_'+index">
                       <span class="name">{{oReMsg.remsg_create_user}}</span>
-                      <span class="text" v-html="oReMsg.response_content"></span>
+                      <span class="text" v-html="showContent(oReMsg.response_content)"></span>
                       <span class="time">{{oReMsg.remsg_create_time}}</span>
-                      <span class="resmsg"><ins id="res_resmsg">回覆</ins></span>
-                      <span class="delmsg" v-if="showDeletresmsg(oReMsg.remsg_create_userid)"><ins id="res_delmsg">刪除</ins></span>
+                      <span class="resmsg" v-if="showResmsg(oReMsg.remsg_create_userid)"><ins id="res_resmsg" title="只有本人能看到回覆的訊息">回覆</ins></span>
+                      <span class="delmsg" v-if="showDeleteresmsg(oReMsg.remsg_create_userid)"><ins id="res_delmsg">刪除</ins></span>
                     </li>
                   </ul>
                   <div class="input-group" style="padding:4px;">
+                    <span class="input-group-btn">
+                      <button id="toAuth" type="button" class="btn" title="只有作者本人能看到回覆的訊息">回覆作者</button>
+                    </span>
                     <textarea v-bind:id="'response_text' + index" class="form-control auto-height" type="text" placeholder="留言‧‧‧‧‧" rows="1"></textarea>
                     <span class="input-group-btn">
-                      <button type="button" class="btn btn-secondary">送出</button>
+                      <button id="send_msg" type="button" class="btn btn-success">送出</button>
                     </span>
                   </div>
                 </div>
