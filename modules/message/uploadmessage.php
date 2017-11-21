@@ -23,8 +23,8 @@
          (msg_sn, touser_id, togroup, msg_type, msg_content, create_time, create_user, attachefile, read_mk, delete_flag)
          VALUES (NULL, :touser_id, :togroup, :msg_type, :msg_content, :create_time, :create_user, :attachefile, :read_mk, :delete_flag)");
 
-       // 判斷留言對象是單一還是群發
-       if (false !== strpos($sToUserid, '>>>ALL')) {
+     // 判斷留言對象是單一還是群發
+     if (false !== strpos($sToUserid, '>>>ALL')) {
         $sToUserid = str_replace('>>>ALL', '', $sToUserid);
         $oSQLUplaodMessage->bindValue(':touser_id', NULL, PDO::PARAM_STR);
         $oSQLUplaodMessage->bindValue(':togroup', $sToUserid, PDO::PARAM_STR);

@@ -73,7 +73,7 @@
     $sSQLParentGroup = '';
     if (!empty($vParentGroup['togroup'])) {
       foreach ($vParentGroup['togroup'] as $sGroupStr) {
-        $sSQLParentGroup .= " OR message_master.togroup LIKE '%$sGroupStr%' ";
+        $sSQLParentGroup .= " OR (message_master.togroup LIKE '%$sGroupStr%' AND message_master.delete_flag = '0') ";
       }
     }
     $sSQLMessage = "SELECT * FROM message_master
@@ -344,6 +344,7 @@
 <!-- Loading套件 -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/extras/loadingoverlay_progress/loadingoverlay_progress.min.js"></script>
+<script src="https://unpkg.com/imagesloaded@4/imagesloaded.pkgd.min.js"></script>
 <script>
   var iFileSizeLimit = 3072000; // 3M (1M = 1024000)
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
@@ -354,8 +355,6 @@
 		$.LoadingOverlay('show');
 
 		$(document).ready(function() {
-      if (oItem.level)
-      $('#stamp_btn').html()
 
       // masonry
       var $grid = $('.grid').masonry({
@@ -387,6 +386,23 @@
         $('.main_content').scrollTop(0);
 			});
 
+      // loadimg
+      $('section > div.qatitle > ul > li > img').imagesLoaded()
+        .always( function( instance ) {
+          console.log('all images loaded');
+        })
+        .done( function( instance ) {
+          $grid.masonry('reloadItems');
+          $grid.masonry('layout');
+        })
+        .fail( function() {
+          console.log('all images loaded, at least one is broken');
+        })
+        .progress( function( instance, image ) {
+          var result = image.isLoaded ? 'loaded' : 'broken';
+          console.log( 'image is ' + result + ' for ' + image.img.src );
+        });
+
       // Vue
       var vueMessage = new Vue({
         el: '#msg_content',
@@ -394,8 +410,6 @@
         mounted: function () {
           var oMsgQuestion = $('.grid-item');
           $grid.prepend(oMsgQuestion).masonry('prepended', oMsgQuestion);
-          $grid.masonry('reloadItems');
-          $grid.masonry('layout');
           $.LoadingOverlay('hide');
           $('#msg_content').css('display', '');
         },
@@ -455,7 +469,7 @@
           deletefile: sDelFile
         };
 
-        if ('' != oMessage.msg_content && '0' == oMessage.attachefile) {
+        if ('' == oMessage.msg_content && '0' == oMessage.attachefile) {
           alert('留言失敗，沒有內容!');
           return;
         }
@@ -546,7 +560,6 @@
           response_content: $('#response_textmsg_' + sIndex).val(),
           remsg_delete_flag: '0'
         };
-
       });
 
       // 刪除回覆的留言
