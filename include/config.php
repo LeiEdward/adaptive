@@ -76,6 +76,13 @@ define('FILESIZE_MB', 1048576);
 define('FILESIZE_GB', 1073741824);
 define('FILESIZE_TB', 1099511627776);
 
+// 身分代號
+define('USER_STUDENT', 1);
+define('USER_PARENTS', 11);
+define('USER_TEACHER', 21);
+define('USER_CITY_ADMIN', 41);
+define('USER_EDU_ADMIN', 51);
+
 //整個網站使用之暫存檔
 define('_SITECONFIG_PATH' , _UPLOAD_PATH."SiteConfig/");
 $SiteFile['SchoolHierselect']=_SITECONFIG_PATH.'SchoolHierselect.txt';  //階層式"已啟用學校列表HTML"

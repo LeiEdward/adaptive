@@ -10,7 +10,7 @@
   $vRtn = array();
   $vRtn['STATUS'] = 'SUCCESS';
   switch($sUpload) {
-    // 上傳
+    // 新增
     case 'INS':
       $sToUserid = base64_decode($_POST['touser_id']);
       $sContent = $_POST['msg_content'];

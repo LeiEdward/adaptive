@@ -18,7 +18,7 @@
   $vMessageData = array();
   $vMessageData = getMessage();
   $vMessageData = handleData($vMessageData);
-  $sButtonLable = ('11' == $vUserData['access_level']) ? '留言給老師' : '留言給家長';
+  $sButtonLable = (USER_PARENTS == $vUserData['access_level']) ? '留言給老師' : '留言給家長';
 
   // 整理資料, 統一變數傳至HTML
   $sJSOject = arraytoJS(array('Userid' => $vUserData['user_id'],
@@ -31,7 +31,7 @@
     $sACL = $vUserData['access_level'];
 
     switch($sACL) {
-      case '11':  // 家長身分
+      case USER_PARENTS:  // 家長身分
         $sUserID = $vUserData['user_id'];
 
         $sSQLParentInfo = "SELECT * FROM user_family
@@ -52,7 +52,7 @@
         }
         break;
 
-      case '21':
+      case USER_TEACHER:
         $sOrganizeID = $vUserData['organization_id'];
         $sGrade = $vUserData['grade'];
         $sClass = $vUserData['class_name'];
@@ -81,6 +81,7 @@
       LEFT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
+      AND message_response.remsg_delete_flag = '0'
       AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
       $sSQLParentGroup
       UNION
@@ -89,6 +90,7 @@
       RIGHT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
+      AND message_response.remsg_delete_flag = '0'
       AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
       $sSQLParentGroup
       ORDER BY msg_sn DESC";
@@ -108,7 +110,7 @@
 
     switch($sACL) {
       // Parents to Teacher
-      case '11':
+      case USER_PARENTS:
         $sTitle = '';
         $vGrade = array();
         $vClass = array();
@@ -133,7 +135,7 @@
         break;
 
       // Teacher to Parents
-      case '21':
+      case USER_TEACHER:
         $sTitle = '家長'; // 給家長
         $sGrade = $vUserData['grade'];
         $sClass = $vUserData['class_name'];
@@ -190,7 +192,7 @@
         else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60))) {
           $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60)).'分';
         }
-        else if (59 <= floor((strtotime($time1) - strtotime($time2)))) {
+        else if (1 <= floor((strtotime($time1) - strtotime($time2)))) {
           $sCreateTime = floor((strtotime($time1) - strtotime($time2))).'秒';
         }
         $vNewData['msg_'.$vMsg['msg_sn']]['msg_sn'] = $vMsg['msg_sn'];
@@ -203,6 +205,7 @@
         $vNewData['msg_'.$vMsg['msg_sn']]['read_mk'] = $vMsg['read_mk'];
         $vNewData['msg_'.$vMsg['msg_sn']]['delete_flag'] = $vMsg['delete_flag'];
         $vNewData['msg_'.$vMsg['msg_sn']]['response_total'] = 0;
+        $vNewData['msg_'.$vMsg['msg_sn']]['checkResbtn'] = true;
 
         // 群發訊息 touser_id 會是NULL
         if (empty($vMsg['touser_id']) && !empty($vMsg['togroup'])) {
@@ -210,7 +213,7 @@
             $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = id2uname($sUserID);
           }
           else {
-            $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = ('11' == $sACL)? '全部老師' : '全班家長';
+            $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = (USER_PARENTS == $sACL)? '全部老師' : '全班家長';
           }
         }
       }
@@ -229,7 +232,15 @@
         }
       }
       if ($vMsg['response_sn'] && !isset($vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']])) {
-        // if ('21' == $sACL && $sUserID != $vMsg['remsg_create_user']) continue;
+        // 刪除不顯示
+        if ('1' == $vMsg['remsg_delete_flag']) continue;
+
+        // 有指定對象回覆訊，只有接收者和發訊息者看的到訊息
+        if (!empty($vMsg['res_resmsgto_user']) && $sUserID != $vMsg['res_resmsgto_user'] && $sUserID != $vMsg['remsg_create_user']) continue;
+
+        // 只有發訊息者可以看到全部的訊息，接收者只能看見本身的訊息與發訊息者的對話
+        if ($sUserID != $vMsg['create_user'] && $sUserID != $vMsg['remsg_create_user'] && $vMsg['create_user'] != $vMsg['remsg_create_user']) continue;
+
         $time1 = date("Y-m-d H:i:s");
         $time2 = substr($vMsg['remsg_create_time'], 0, 16);
         $sCreateTime = '';
@@ -242,12 +253,12 @@
         else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60))) {
           $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60)).'分';
         }
-        else if (59 <= floor((strtotime($time1) - strtotime($time2)))) {
+        else if (1 <= floor((strtotime($time1) - strtotime($time2)))) {
           $sCreateTime = floor((strtotime($time1) - strtotime($time2))).'秒';
         }
         $vNewData['msg_'.$vMsg['msg_sn']]['response_total']++;
         $vNewData['msg_'.$vMsg['msg_sn']]['remsgindex'] = $vMsg['response_sn'];
-        $vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['response_content']),
+        $vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => str_replace(array("\r", "\n", "\r\n", "\n\r"), ' ', $vMsg['response_content']),
                                                                                  'remsg_create_user' => id2uname($vMsg['remsg_create_user']),
                                                                                  'remsg_create_userid' => $vMsg['remsg_create_user'],
                                                                                  'res_resmsgto_user' => $vMsg['res_resmsgto_user'],
@@ -276,7 +287,7 @@
   /* 留言浮動框 */
   .grid-item {position:relative;margin-bottom:10px;height:250;}
   .accordionPart > section {border:solid 1px #E3E3E3;}
-  .accordionPart > section.grid-item {width:320px;float:left;}
+  .accordionPart > section.grid-item {width:380px;float:left;}
   .accordionPart > section.open {width:100%;float:left;}
   .accordionPart > section.open > div.qa_content {display:inherit !important;background-color:#f6f7f9;}
   .accordionPart > section > div.qa_title {cursor:pointer;position:relative;}
@@ -296,7 +307,9 @@
   .qa_title > ul > li > .attachedfile > .filename > span:hover {color:rgb(0, 0, 255);}
 
   /* 留言回覆 */
+  .qa_content > ul > li {padding:5px 0px;}
   .qa_content > ul > li > .name {color:rgb(0, 0, 255);}
+  /*.qa_content > ul > li > .text {display:block;}*/
   .qa_content > ul > li > .time, .qa_content > ul > li > .resmsg, .qa_content > ul > li > .delmsg {font-size:14px;color:rgb(157, 157, 157);}
   .qa_content > ul > li > .resmsg, .qa_content > ul > li > .delmsg {color:rgb(150, 150, 255);cursor:pointer;}
   .qa_content > ul > li > .resmsg:active, .qa_content > ul > li > .delmsg:active {color:rgb(255, 193, 7);}
@@ -333,11 +346,12 @@
   .bd1 {border:1px solid rgb(164, 164, 164);}
   .h125 {height:125px;}
   .del {position:absolute;top:0px;right:0px;width:10px;height:10px;z-index:10;cursor:pointer;}
+  .privatemsg {color:rgba(0, 150, 0, 1);font-size:14px;font-style:normal;}
 
   /* RWD */
-  @media screen and (min-width: 500px) {
-    .accordionPart > section.grid-item {width:380px;float:left;}
-    .accordionPart > section.open {width:100%;float:left;}
+  @media screen and (max-width: 500px) {
+    .accordionPart > section.grid-item {width:100%;float:left;}
+    .main_content {height:auto;width:100%;overflow:hidden;overflow-y:auto;}
   }
 </style>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.1/vue.js"></script>
@@ -353,7 +367,7 @@
   var oReMsg = {};
   var sDelFile = '';
 
-  console.log(oItem);
+  // console.log(oItem);
   $(function() {
 		$.LoadingOverlay('show');
 
@@ -391,18 +405,14 @@
       // loadIMG
       $('section > div.qatitle > ul > li > img').imagesLoaded()
         .always( function( instance ) {
-          console.log('all images loaded');
         })
         .done( function( instance ) {
           $grid.masonry('reloadItems');
           $grid.masonry('layout');
         })
         .fail( function() {
-          console.log('all images loaded, at least one is broken');
         })
         .progress( function( instance, image ) {
-          var result = image.isLoaded ? 'loaded' : 'broken';
-          console.log( 'image is ' + result + ' for ' + image.img.src );
         });
 
       // Vue
@@ -422,7 +432,7 @@
           addremsg: function(oArg) {
             if (0 === this.Message[oArg.index].response_total) {
               // 留言資料
-              this.Message[oArg.index].remsg = Object.assign({}, this.Message[oArg.index] .remsg, {
+              this.Message[oArg.index].remsg = Object.assign({}, this.Message[oArg.index].remsg, {
                 0: oArg.data
               });
 
@@ -447,15 +457,34 @@
               $grid.masonry('layout');
             })
           },
+          delremsg: function (oArg) {
+            // console.log(this.Message['msg_' + oArg.MsgIndex].remsg[oArg.ReMsgIndex]);
+            if (!!this.Message['msg_' + oArg.MsgIndex].remsg[oArg.ReMsgIndex]) {
+              this.$set(this.Message['msg_' + oArg.MsgIndex].remsg, oArg.ReMsgIndex, {});
+            }
+            vueMessage.$nextTick(function () {
+              $grid.masonry('reloadItems');
+              $grid.masonry('layout');
+            })
+          },
           showResmsg: function (sArg) {
+            // console.log(sArg);
             return (sArg !== oItem.Userid);
           },
-          showDeleteresmsg: function(sArg) {
-            return (sArg === oItem.Userid);
+          showDeleteresmsg: function(sArg, sCreateTime) {
+            return (sArg === oItem.Userid && '剛剛' != sCreateTime);
           },
           showContent: function (sArg) {
-            var sName = sArg.match(/@[\u4e00-\u9fa5_a-zA-Z0-9]+/g);
-            return sArg.replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+/g, '<i style="color:rgb(150, 150, 255);font-size:14px;font-style: normal;">' + sName +'</i>');
+            var sName = sArg.match(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g);
+            return sArg.replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g, '<i class="privatemsg">' + sName +'</i>');
+          },
+          clickAuth: function (sIndx) {
+            if (true == this.Message[sIndx].checkResbtn) {
+              this.Message[sIndx].checkResbtn = false;
+            }
+
+            vueMessage.$nextTick();
+            return;
           }
         }
       })
@@ -512,6 +541,7 @@
         });
 
         var oResponse = {
+          upload: 'INS',
           message_sn: sIndex,
           remsg_create_user: oItem.Userid,
           response_content: $('#response_textmsg_' + sIndex).val(),
@@ -532,6 +562,9 @@
 
               var oRtn = JSON.parse(sRtn);
               if ('SUCCESS' === oRtn.STATUS) {
+                oRtn.CONTENT = oRtn.CONTENT.replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g, '<i class="privatemsg">@' + oReMsg.res_resmsgto_user + '</i> ');
+                $('.qa_content > .input-group > span.input-group-btn > #toAuth').removeClass('btn-primary');
+
                 vueMessage.addremsg({
                   index: 'msg_' + oResponse.message_sn,
                   data: {
@@ -557,7 +590,6 @@
       // 留言給作者本人
       $('.qa_content > .input-group > span.input-group-btn > #toAuth').click(function (e) {
         var sIndex, sRemsgIndex, sName, sRemsgUid;
-        $(e.target).toggleClass("btn-primary");
 
         $(e.target).parents().map(function () {
           if ('qa_content' === $(this).attr('class')) {
@@ -570,24 +602,37 @@
         sName = oItem.Message['msg_'+ sIndex].create_user;
 
         $('#response_textmsg_' + sIndex).focus();
+
+        if ('' != $('#response_textmsg_' + sIndex).val()) {
+          var sFindStr = $('#response_textmsg_' + sIndex).val().match(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g);
+          if (null !== sFindStr && 0 < $('#response_textmsg_' + sIndex).val().match(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g).length) {
+            $('#response_textmsg_' + sIndex).val($('#response_textmsg_' + sIndex).val().replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g, '@'+ sName + ' '));
+          }
+        }
         if (-1 == $('#response_textmsg_' + sIndex).val().indexOf('@'+ sName + ' ')) {
           insertAtCursor($('#response_textmsg_' + sIndex)[0], '@'+ sName + ' ');
-          oReMsg = {
-            message_sn: sIndex,
-            remsg_create_user: oItem.Userid,
-            res_resmsgto_userid: sRemsgUid,
-            res_resmsgto_user: sName,
-            response_content: $('#response_textmsg_' + sIndex).val(),
-            remsg_delete_flag: '0'
-          };
         }
-        else {
-          $('#response_textmsg_' + sIndex).val($('#response_textmsg_' + sIndex).val().replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+ /g, ''));
+
+        if ($(e.target).hasClass('btn-primary')) {
+          $('#response_textmsg_' + sIndex).val($('#response_textmsg_' + sIndex).val().replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g, ''));
         }
+
+        oReMsg = {
+          message_sn: sIndex,
+          remsg_create_user: oItem.Userid,
+          res_resmsgto_userid: sRemsgUid,
+          res_resmsgto_user: sName,
+          response_content: $('#response_textmsg_' + sIndex).val(),
+          remsg_delete_flag: '0'
+        };
+
+        $(e.target).toggleClass('btn-primary');
       });
 
       // 回覆留言的訊息
       $('.qa_content > ul > li > .resmsg').click(function (e) {
+        $('.qa_content > .input-group > span.input-group-btn > #toAuth').removeClass('btn-primary');
+
         var sIndex, sName, sRemsgUid;
         $(e.target).parents().map(function () {
           if ('qa_content' === $(this).attr('class')) {
@@ -603,7 +648,7 @@
         if (!!oItem.Message['msg_'+ sIndex].remsg[sRemsgIndex].remsg_create_userid) {
           sRemsgUid = oItem.Message['msg_'+ sIndex].remsg[sRemsgIndex].remsg_create_userid;
         }
-
+        // console.log(123123);
         $(e.target).parent().prevAll().map(function (e) {
           if ('name' === $(this).attr('class')) {
             sName = $(this).html();
@@ -611,7 +656,15 @@
           }
         });
         $('#response_textmsg_' + sIndex).focus();
-        if (-1 == $('#response_textmsg_' + sIndex).val().indexOf( '@'+ sName + ' ')) {
+
+        if ('' != $('#response_textmsg_' + sIndex).val()) {
+          var sFindStr = $('#response_textmsg_' + sIndex).val().match(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g);
+          if (null !== sFindStr && 0 < $('#response_textmsg_' + sIndex).val().match(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g).length) {
+            $('#response_textmsg_' + sIndex).val($('#response_textmsg_' + sIndex).val().replace(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g, '@'+ sName + ' '));
+          }
+        }
+
+        if (-1 == $('#response_textmsg_' + sIndex).val().indexOf('@'+ sName + ' ')) {
           insertAtCursor($('#response_textmsg_' + sIndex)[0], '@'+ sName + ' ');
         }
 
@@ -625,10 +678,52 @@
         };
       });
 
-
       // 刪除回覆的留言
       $('.qa_content > ul > li > .delmsg').click(function (e) {
-        console.log('delmsg');
+        var bSureDelete = confirm("確定要刪除訊息?");
+        if (bSureDelete != true) return;
+
+        var sMsgIndex, sReMsgIndex;
+        $(e.target).parents().map(function () {
+          if ('qa_content' === $(this).attr('class')) {
+            sMsgIndex = $(this).prev().attr('id');
+            sMsgIndex = sIndex.substr(sIndex.indexOf('_') + 1);
+            return;
+          }
+        });
+        // console.log($(e.target).parent().parent());
+        sReMsgIndex = $(e.target).parent().parent().attr('id');
+        sReMsgIndex = sReMsgIndex.substr(sReMsgIndex.indexOf('_') + 1);
+
+        var oResponse = {
+          upload: 'DEL',
+          message_sn: sReMsgIndex
+        };
+
+        $.ajax({
+            url: './modules/message/uploadresponse.php',
+            data: oResponse,
+            method: "POST",
+            success: function (sRtn) {
+
+              var oRtn = JSON.parse(sRtn);
+              if ('SUCCESS' === oRtn.STATUS) {
+                location.reload();
+                // vueMessage.delremsg({
+                //   MsgIndex: sMsgIndex,
+                //   ReMsgIndex: sReMsgIndex
+                // });
+                // $('#response_textmsg_' + sIndex).val('');
+                // $grid.masonry('reloadItems');
+              }
+              else {
+                alert(oRtn.MSG);
+              }
+            },
+            error: function (jqXHR, textStatus, errorMessage) {
+                alert('伺服器連線不穩定，請稍後再試!')
+            }
+        });
       });
 
       // 新增 檔案
@@ -768,6 +863,8 @@
           if ('qa_title' === $(this).attr('class') || 'qa_title delete' === $(this).attr('class')) {
             sIndex = $(this).attr('id');
             sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
+
+            $('article.main_content').scrollTo($('#response_textmsg_' + sIndex),1);
             $('#response_textmsg_' + sIndex).focus();
           }
         });
@@ -847,18 +944,18 @@ function insertAtCursor(myField, myValue) {
   								</ul>
   							</div>
                 <div class="qa_content">
-                  <ul v-for="(oReMsg, index) in item.remsg">
-                    <li v-bind:id="'resmsg_'+index">
+                  <ul v-for="(oReMsg, ReMsgIndx) in item.remsg">
+                    <li v-bind:id="'resmsg_'+ReMsgIndx">
                       <span class="name">{{oReMsg.remsg_create_user}}</span>
                       <span class="text" v-html="showContent(oReMsg.response_content)"></span>
                       <span class="time">{{oReMsg.remsg_create_time}}</span>
-                      <span class="resmsg" v-if="showResmsg(oReMsg.remsg_create_userid)"><ins id="res_resmsg" title="只有本人能看到回覆的訊息">回覆</ins></span>
-                      <span class="delmsg" v-if="showDeleteresmsg(oReMsg.remsg_create_userid)"><ins id="res_delmsg">刪除</ins></span>
+                      <span class="resmsg" v-if="showResmsg(oReMsg.remsg_create_userid)"><ins id="res_resmsg" title="只有本人能看到回覆的訊息，一次只能回覆一名對象">回覆</ins></span>
+                      <span class="delmsg" v-if="showDeleteresmsg(oReMsg.remsg_create_userid, oReMsg.remsg_create_time)"><ins id="res_delmsg">刪除</ins></span>
                     </li>
                   </ul>
                   <div class="input-group" style="padding:4px;">
                     <span class="input-group-btn">
-                      <button id="toAuth" type="button" class="btn" title="只有作者本人能看到回覆的訊息">回覆作者</button>
+                      <button id="toAuth" type="button" class="btn" title="只有本人能看到回覆的訊息，一次只能回覆一名對象" v-if="showResmsg(item.create_userid)">回覆作者</button>
                     </span>
                     <textarea v-bind:id="'response_text' + index" class="form-control auto-height" type="text" placeholder="留言‧‧‧‧‧" rows="1"></textarea>
                     <span class="input-group-btn">
