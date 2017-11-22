@@ -136,7 +136,7 @@
 
       // Teacher to Parents
       case USER_TEACHER:
-        $sTitle = '家長'; // 給家長
+        $sTitle = ''; // 給家長
         $sGrade = $vUserData['grade'];
         $sClass = $vUserData['class_name'];
         $sSchool = $vUserData['organization_id'];
@@ -161,7 +161,8 @@
       $vTo[] = '<select id="sel_parent">';
       $vTo[] =   '<option value="'.base64_encode($sToAll).'">全部</option>';
       foreach($vTOWHO as $vWHO) {
-        $sToName = id2uname($vWHO['user_id']);
+        // $sToName = id2uname($vWHO['user_id']);
+        $sToName = id2uname($vWHO['towho']);
         $vTo[] = '<option value="'.base64_encode($vWHO['towho']).'">'.$sToName.' '. $sTitle.'</option>';
       }
       $vTo[] = '</select>';
