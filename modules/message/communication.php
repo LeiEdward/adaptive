@@ -864,6 +864,29 @@
             sIndex = $(this).attr('id');
             sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
 
+            var oMessage = {
+              upload: 'MOD',
+              messageid: sIndex
+            };
+
+            $.ajax({
+                url: './modules/message/uploadmessage.php',
+                data: oMessage,
+                method: "POST",
+                success: function (sRtn) {
+                  var oRtn = JSON.parse(sRtn);
+                  if ('SUCCESS' === oRtn.STATUS) {
+                    console.log(oRtn);
+                  }
+                  else {
+                    alert(oRtn.MSG);
+                  }
+                },
+                error: function (jqXHR, textStatus, errorMessage) {
+                  alert('伺服器連線不穩定，請稍後再試!');
+                }
+            });
+
             $('article.main_content').scrollTo($('#response_textmsg_' + sIndex),1);
             $('#response_textmsg_' + sIndex).focus();
           }

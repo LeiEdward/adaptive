@@ -78,7 +78,7 @@
         }
         else {
           $vRtn['STATUS'] = 'ERR';
-          $vRtn['MSG'] = '檔案上傳異常，錯誤代碼: MD_MSG_UMx072';
+          $vRtn['MSG'] = '檔案上傳異常，錯誤代碼: MD_MSG_UMx081';
         }
 
         if (!empty($vTmpFile)) {
@@ -95,6 +95,23 @@
       unset($_SESSION['message']['uploadfile']);
       break;
 
+    case 'MOD':
+      $sMessageID = $_POST['messageid'];
+      $oSQLDeleteMessage = $dbh->prepare("UPDATE message_master SET read_mk = '1' WHERE msg_sn = :msg_sn");
+      $oSQLDeleteMessage->bindValue(':msg_sn', $sMessageID, PDO::PARAM_STR);
+      $oSQLDeleteMessage->execute();
+
+      $oSQLCheckMessage = $dbh->prepare("SELECT read_mk FROM message_master WHERE msg_sn = :msg_sn");
+      $oSQLCheckMessage->bindValue(':msg_sn', $sMessageID, PDO::PARAM_STR);
+      $oSQLCheckMessage->execute();
+      $vMessage = $oSQLCheckMessage->fetch();
+      if ('1' != $vMessage['read_mk']) {
+        $vRtn['STATUS'] = 'ERR';
+        $vRtn['MSG'] = '訊息標記失敗: MD_MSG_UMx0110';
+      }
+      $vRtn['LOG'] = 'mod';
+      break;
+
     // 刪除
     case 'DEL':
       $sMessageID = $_POST['messageid'];
@@ -108,7 +125,7 @@
       $vMessage = $oSQLCheckMessage->fetch();
       if ('1' != $vMessage['delete_flag']) {
         $vRtn['STATUS'] = 'ERR';
-        $vRtn['MSG'] = '訊息刪除失敗: MD_MSG_UMx0102';
+        $vRtn['MSG'] = '訊息刪除失敗: MD_MSG_UMx0127';
       }
       break;
   }
