@@ -367,7 +367,6 @@
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
   var oReMsg = {};
   var sDelFile = '';
-
   // console.log(oItem);
   $(function() {
 		$.LoadingOverlay('show');
@@ -862,8 +861,8 @@
 			  $grid.masonry('layout');
         $(e.target).parents().map(function () {
           if ('qa_title' === $(this).attr('class') || 'qa_title delete' === $(this).attr('class')) {
-            sIndex = $(this).attr('id');
-            sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
+            sLongIndex = $(this).attr('id');
+            sIndex = sLongIndex.substr(sLongIndex.indexOf('_') + 1);
 
             var oMessage = {
               upload: 'MOD',
@@ -877,7 +876,7 @@
                 success: function (sRtn) {
                   var oRtn = JSON.parse(sRtn);
                   if ('SUCCESS' === oRtn.STATUS) {
-                    console.log(oRtn);
+                    // console.log(oRtn);
                   }
                   else {
                     alert(oRtn.MSG);
@@ -887,9 +886,17 @@
                   alert('伺服器連線不穩定，請稍後再試!');
                 }
             });
+            if ($('#' + sLongIndex + '_section').hasClass('open')) {
+              $('.accordionPart > section.grid-item').fadeTo('fast',0.2);
+              $('#response_textmsg_' + sIndex).focus();
+              $('#' + sLongIndex + '_section').fadeTo('fast',1);
+            }
+            else {
+              $('.accordionPart > section.grid-item').fadeTo('fast',1);
+            }
 
-            $('article.main_content').scrollTo($('#response_textmsg_' + sIndex),1);
-            $('#response_textmsg_' + sIndex).focus();
+            $grid.masonry('reloadItems');
+            $grid.masonry();
           }
         });
 			});
@@ -945,7 +952,7 @@ function insertAtCursor(myField, myValue) {
 							<button id="sumbit_btn" name="sumbit_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
             <div id="msg_content" style="display:none;">
-              <section v-for="(item, index) in Message" class="grid-item">
+              <section v-for="(item, index) in Message" v-bind:id="index + '_section'" class="grid-item">
                 <span class="del">&nbsp;</span>
                 <div v-bind:id="index" class="qa_title" v-bind:class="[matchClass(item.create_userid) ? 'delete' : '']">
   								<ul>
@@ -969,7 +976,7 @@ function insertAtCursor(myField, myValue) {
   							</div>
                 <div class="qa_content">
                   <ul v-for="(oReMsg, ReMsgIndx) in item.remsg">
-                    <li v-bind:id="'resmsg_'+ReMsgIndx">
+                      <li v-bind:id="'resmsg_'+ReMsgIndx">
                       <span class="name">{{oReMsg.remsg_create_user}}</span>
                       <span class="text" v-html="showContent(oReMsg.response_content)"></span>
                       <span class="time">{{oReMsg.remsg_create_time}}</span>
