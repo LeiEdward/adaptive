@@ -16,14 +16,14 @@
          VALUES (NULL, :message_sn, :response_content, :remsg_create_user, :res_resmsgto_user, :remsg_create_time, :remsg_delete_flag)");
 
       $sMessageid = $_POST['message_sn'];
-      $sContent = $_POST['response_content'];
+      $sContent = strip_tags($_POST['response_content']);
       $sCreateUser = $_POST['remsg_create_user'];
       $sDele = $_POST['remsg_delete_flag'];
       $sTime = date("Y-m-d H:i:s");
       $sResMsgto_userid = $_POST['res_resmsgto_userid'];
 
       $oSQLUplaodReponse->bindValue(':message_sn', $sMessageid, PDO::PARAM_STR);
-      $oSQLUplaodReponse->bindValue(':response_content', strip_tags($sContent), PDO::PARAM_STR);
+      $oSQLUplaodReponse->bindValue(':response_content', $sContent, PDO::PARAM_STR);
       $oSQLUplaodReponse->bindValue(':remsg_create_time', $sTime, PDO::PARAM_STR);
       $oSQLUplaodReponse->bindValue(':remsg_create_user', $sCreateUser, PDO::PARAM_STR);
       $oSQLUplaodReponse->bindValue(':res_resmsgto_user', $sResMsgto_userid, PDO::PARAM_STR);

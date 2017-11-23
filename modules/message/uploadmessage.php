@@ -13,7 +13,7 @@
     // 新增
     case 'INS':
       $sToUserid = base64_decode($_POST['touser_id']);
-      $sContent = $_POST['msg_content'];
+      $sContent = strip_tags($_POST['msg_content']);
       $sCreateUser = $_POST['create_user'];
       $sAttached = $_POST['attachefile'];
       $sRead_mk = $_POST['read_mk'];
@@ -34,7 +34,7 @@
         $oSQLUplaodMessage->bindValue(':togroup', NULL, PDO::PARAM_STR);
       }
       $oSQLUplaodMessage->bindValue(':msg_type', '2', PDO::PARAM_STR); // msg_type:2 親師
-      $oSQLUplaodMessage->bindValue(':msg_content', strip_tags($sContent), PDO::PARAM_STR);
+      $oSQLUplaodMessage->bindValue(':msg_content', $sContent, PDO::PARAM_STR);
       $oSQLUplaodMessage->bindValue(':create_time', date("Y-m-d H:i:s"), PDO::PARAM_STR);
       $oSQLUplaodMessage->bindValue(':create_user', $sCreateUser, PDO::PARAM_STR);
       $oSQLUplaodMessage->bindValue(':attachefile', $sAttached, PDO::PARAM_STR);

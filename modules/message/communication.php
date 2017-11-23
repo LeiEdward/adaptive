@@ -82,7 +82,8 @@
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
       AND message_response.remsg_delete_flag = '0'
-      AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+      OR (message_master.touser_id = '$sUserID' AND message_master.delete_flag = '0')
+      OR (message_master.create_user ='$sUserID' AND message_master.delete_flag = '0')
       $sSQLParentGroup
       UNION
       SELECT * FROM message_master
@@ -91,10 +92,11 @@
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
       AND message_response.remsg_delete_flag = '0'
-      AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+      OR (message_master.touser_id = '$sUserID' AND message_master.delete_flag = '0')
+      OR (message_master.create_user ='$sUserID' AND message_master.delete_flag = '0')
       $sSQLParentGroup
       ORDER BY msg_sn DESC";
-      // echo $sSQLMessage;
+      // debugBai('','',$sSQLMessage);
     $oMessage = $dbh->prepare($sSQLMessage);
     $oMessage->execute();
     $vMessageData = $oMessage->fetchAll(\PDO::FETCH_ASSOC);
@@ -548,7 +550,16 @@
           remsg_delete_flag: '0'
         };
 
-        if ('' === oResponse.response_content) return;
+        try {
+            $.parseJSON(oResponse.response_content);
+        }
+        catch(err) {
+          oResponse.ERR = '有不合法的特殊字元，請確認內容';
+          alert(oResponse.ERR);
+        }
+
+        if ('' === oResponse.response_content || !!oResponse.ERR) return;
+
         if (!!oReMsg && -1 != oResponse.response_content.indexOf('@' + oReMsg.res_resmsgto_user)) {
           oResponse.res_resmsgto_userid = oReMsg.res_resmsgto_userid;
           oResponse.res_resmsgto_user = oReMsg.res_resmsgto_user;
@@ -579,6 +590,7 @@
                 $grid.masonry('reloadItems');
               }
               else {
+                alert(oRtn.MSG);
               }
             },
             error: function (jqXHR, textStatus, errorMessage) {
@@ -730,7 +742,8 @@
       $('body').on('change', '.toolbar > li > i > input', function (e) {
         if (typeof this.files[0] === 'undefined') return;
 
-        var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt','pdf'];
+        // 給後端驗證
+        // var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt','pdf'];
         var filename = this.files[0].name;
         var filetype = this.files[0].type;
         var filesize = this.files[0].size;
@@ -743,10 +756,10 @@
           alert('您的檔案名稱不能含有特殊字元 .');
           return;
         }
-        if (-1 == $.inArray(filename.split('.').pop(), vPassType)) {
-          alert('不接受此格式檔案!');
-          return;
-        }
+        // if (-1 == $.inArray(filename.split('.').pop(), vPassType)) {
+        //   alert('不接受此格式檔案!');
+        //   return;
+        // }
         var fileupload = $('#uplodefile').prop('files')[0];
         var oForm = new FormData();
         oForm.append('import_file', fileupload);
@@ -925,7 +938,6 @@ function insertAtCursor(myField, myValue) {
         myField.value += myValue;
     }
 }
-
 </script>
   <div class="content2-Box">
 	  <div class="path">目前位置：親師互動</div>
