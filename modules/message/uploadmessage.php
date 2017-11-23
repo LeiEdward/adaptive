@@ -13,7 +13,7 @@
     // 新增
     case 'INS':
       $sToUserid = base64_decode($_POST['touser_id']);
-      $sContent = $_POST['msg_content'];
+      $sContent = strip_tags($_POST['msg_content']);
       $sCreateUser = $_POST['create_user'];
       $sAttached = $_POST['attachefile'];
       $sRead_mk = $_POST['read_mk'];
@@ -34,7 +34,7 @@
         $oSQLUplaodMessage->bindValue(':togroup', NULL, PDO::PARAM_STR);
       }
       $oSQLUplaodMessage->bindValue(':msg_type', '2', PDO::PARAM_STR); // msg_type:2 親師
-      $oSQLUplaodMessage->bindValue(':msg_content', strip_tags($sContent), PDO::PARAM_STR);
+      $oSQLUplaodMessage->bindValue(':msg_content', $sContent, PDO::PARAM_STR);
       $oSQLUplaodMessage->bindValue(':create_time', date("Y-m-d H:i:s"), PDO::PARAM_STR);
       $oSQLUplaodMessage->bindValue(':create_user', $sCreateUser, PDO::PARAM_STR);
       $oSQLUplaodMessage->bindValue(':attachefile', $sAttached, PDO::PARAM_STR);
@@ -78,7 +78,7 @@
         }
         else {
           $vRtn['STATUS'] = 'ERR';
-          $vRtn['MSG'] = '檔案上傳異常，錯誤代碼: MD_MSG_UMx072';
+          $vRtn['MSG'] = '檔案上傳異常，錯誤代碼: MD_MSG_UMx081';
         }
 
         if (!empty($vTmpFile)) {
@@ -95,6 +95,23 @@
       unset($_SESSION['message']['uploadfile']);
       break;
 
+    case 'MOD':
+      $sMessageID = $_POST['messageid'];
+      $oSQLDeleteMessage = $dbh->prepare("UPDATE message_master SET read_mk = '1' WHERE msg_sn = :msg_sn");
+      $oSQLDeleteMessage->bindValue(':msg_sn', $sMessageID, PDO::PARAM_STR);
+      $oSQLDeleteMessage->execute();
+
+      $oSQLCheckMessage = $dbh->prepare("SELECT read_mk FROM message_master WHERE msg_sn = :msg_sn");
+      $oSQLCheckMessage->bindValue(':msg_sn', $sMessageID, PDO::PARAM_STR);
+      $oSQLCheckMessage->execute();
+      $vMessage = $oSQLCheckMessage->fetch();
+      if ('1' != $vMessage['read_mk']) {
+        $vRtn['STATUS'] = 'ERR';
+        $vRtn['MSG'] = '訊息標記失敗: MD_MSG_UMx0110';
+      }
+      $vRtn['LOG'] = 'mod';
+      break;
+
     // 刪除
     case 'DEL':
       $sMessageID = $_POST['messageid'];
@@ -108,7 +125,7 @@
       $vMessage = $oSQLCheckMessage->fetch();
       if ('1' != $vMessage['delete_flag']) {
         $vRtn['STATUS'] = 'ERR';
-        $vRtn['MSG'] = '訊息刪除失敗: MD_MSG_UMx0102';
+        $vRtn['MSG'] = '訊息刪除失敗: MD_MSG_UMx0127';
       }
       break;
   }

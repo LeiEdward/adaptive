@@ -49,7 +49,7 @@ if ($_GET['act']=='logout' && $auth->checkAuth()) {
 
 $mem_usage=null;
 
-$search_count2 = $dbh->prepare("SELECT count(*) num FROM `message_master` a  WHERE a.touser_id =:user_id and read_mk =:read_mk");
+$search_count2 = $dbh->prepare("SELECT count(*) num FROM `message_master` a  WHERE a.touser_id =:user_id and read_mk =:read_mk and delete_flag = '0'");
 $search_count2->bindValue(':user_id', $user_id, PDO::PARAM_STR);
 $search_count2->bindValue(':read_mk', '0', PDO::PARAM_INT);
 $search_count2->execute();
@@ -110,7 +110,7 @@ if($user_data->access_level < 10){
 var url = 'modules.php?op=modload&';
 swal({
 	title: '關於我',
-	html: '<div ><img src="images/role/head/head01.png"  style="float:left;width:40%;height:40%;vertical-align:middle;">'+
+	html: '<div ><img src="images/role/Girl04.png"  style="float:left;width:40%;height:40%;vertical-align:middle;">'+
 		'<div class="class-root-box" >我想開始挑戰新的任務  <a class="btn07" href="'+ url +'name=assignMission&file=mission_action">GO！</a></div>'+
 		'<div class="class-root-box" >回到挑戰上一次的任務  <a href="'+ url +'name=indicateTest&file=indicateAdaptiveTest&mission_sn=2766" class="btn07">GO！</a></div>'+
 		'<div class="class-root-box" >同學有問題，我來回答   <a href="'+ url +'name=learn_video&file=video_askquestion#parentHorizontalTab4" class="btn07">GO！</a></div>'+
@@ -157,7 +157,7 @@ $(function() {
 var url = 'modules.php?op=modload&';
 swal({
 	title: '選擇要進行的教學模式',
-	html: '<div ><img src="images/role/head/head01.png"  style="float:left;width:30%;height:30%;vertical-align:middle;">'+
+	html: '<div ><img src="images/role/Man.png"  style="float:left;width:30%;height:30%;vertical-align:middle;">'+
 		'<div class="class-root-box" ><a href="'+ url +'name=assignMission&file=assignment2" class="btn07">翻轉教室 <i class="fa fa-arrow-right"></i></a></div>'+
 		'<div class="class-root-box" ><a href="'+ url +'name=assignMission&file=assignment3" class="btn07" >適性診斷與補救教學(縱貫) <i class="fa fa-arrow-right"></i></a></div>'+
 		'<div class="class-root-box" ><a href="'+ url +'name=assignMission&file=assignment" class="btn07" >適性診斷與補救教學(單元) <i class="fa fa-arrow-right"></i></a></div>'+

@@ -82,7 +82,8 @@
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
       AND message_response.remsg_delete_flag = '0'
-      AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+      OR (message_master.touser_id = '$sUserID' AND message_master.delete_flag = '0')
+      OR (message_master.create_user ='$sUserID' AND message_master.delete_flag = '0')
       $sSQLParentGroup
       UNION
       SELECT * FROM message_master
@@ -91,10 +92,11 @@
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
       AND message_response.remsg_delete_flag = '0'
-      AND (message_master.touser_id = '$sUserID' OR message_master.create_user ='$sUserID')
+      OR (message_master.touser_id = '$sUserID' AND message_master.delete_flag = '0')
+      OR (message_master.create_user ='$sUserID' AND message_master.delete_flag = '0')
       $sSQLParentGroup
       ORDER BY msg_sn DESC";
-      // echo $sSQLMessage;
+      // debugBai('','',$sSQLMessage);
     $oMessage = $dbh->prepare($sSQLMessage);
     $oMessage->execute();
     $vMessageData = $oMessage->fetchAll(\PDO::FETCH_ASSOC);
@@ -136,7 +138,7 @@
 
       // Teacher to Parents
       case USER_TEACHER:
-        $sTitle = '家長'; // 給家長
+        $sTitle = ''; // 給家長
         $sGrade = $vUserData['grade'];
         $sClass = $vUserData['class_name'];
         $sSchool = $vUserData['organization_id'];
@@ -161,7 +163,8 @@
       $vTo[] = '<select id="sel_parent">';
       $vTo[] =   '<option value="'.base64_encode($sToAll).'">全部</option>';
       foreach($vTOWHO as $vWHO) {
-        $sToName = id2uname($vWHO['user_id']);
+        // $sToName = id2uname($vWHO['user_id']);
+        $sToName = id2uname($vWHO['towho']);
         $vTo[] = '<option value="'.base64_encode($vWHO['towho']).'">'.$sToName.' '. $sTitle.'</option>';
       }
       $vTo[] = '</select>';
@@ -366,7 +369,6 @@
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
   var oReMsg = {};
   var sDelFile = '';
-
   // console.log(oItem);
   $(function() {
 		$.LoadingOverlay('show');
@@ -548,7 +550,16 @@
           remsg_delete_flag: '0'
         };
 
-        if ('' === oResponse.response_content) return;
+        try {
+            $.parseJSON(oResponse.response_content);
+        }
+        catch(err) {
+          oResponse.ERR = '有不合法的特殊字元，請確認內容';
+          alert(oResponse.ERR);
+        }
+
+        if ('' === oResponse.response_content || !!oResponse.ERR) return;
+
         if (!!oReMsg && -1 != oResponse.response_content.indexOf('@' + oReMsg.res_resmsgto_user)) {
           oResponse.res_resmsgto_userid = oReMsg.res_resmsgto_userid;
           oResponse.res_resmsgto_user = oReMsg.res_resmsgto_user;
@@ -579,6 +590,7 @@
                 $grid.masonry('reloadItems');
               }
               else {
+                alert(oRtn.MSG);
               }
             },
             error: function (jqXHR, textStatus, errorMessage) {
@@ -730,7 +742,8 @@
       $('body').on('change', '.toolbar > li > i > input', function (e) {
         if (typeof this.files[0] === 'undefined') return;
 
-        var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt','pdf'];
+        // 給後端驗證
+        // var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt','pdf'];
         var filename = this.files[0].name;
         var filetype = this.files[0].type;
         var filesize = this.files[0].size;
@@ -743,10 +756,10 @@
           alert('您的檔案名稱不能含有特殊字元 .');
           return;
         }
-        if (-1 == $.inArray(filename.split('.').pop(), vPassType)) {
-          alert('不接受此格式檔案!');
-          return;
-        }
+        // if (-1 == $.inArray(filename.split('.').pop(), vPassType)) {
+        //   alert('不接受此格式檔案!');
+        //   return;
+        // }
         var fileupload = $('#uplodefile').prop('files')[0];
         var oForm = new FormData();
         oForm.append('import_file', fileupload);
@@ -861,11 +874,42 @@
 			  $grid.masonry('layout');
         $(e.target).parents().map(function () {
           if ('qa_title' === $(this).attr('class') || 'qa_title delete' === $(this).attr('class')) {
-            sIndex = $(this).attr('id');
-            sIndex = sIndex.substr(sIndex.indexOf('_') + 1);
+            sLongIndex = $(this).attr('id');
+            sIndex = sLongIndex.substr(sLongIndex.indexOf('_') + 1);
 
-            $('article.main_content').scrollTo($('#response_textmsg_' + sIndex),1);
-            $('#response_textmsg_' + sIndex).focus();
+            var oMessage = {
+              upload: 'MOD',
+              messageid: sIndex
+            };
+
+            $.ajax({
+                url: './modules/message/uploadmessage.php',
+                data: oMessage,
+                method: "POST",
+                success: function (sRtn) {
+                  var oRtn = JSON.parse(sRtn);
+                  if ('SUCCESS' === oRtn.STATUS) {
+                    // console.log(oRtn);
+                  }
+                  else {
+                    alert(oRtn.MSG);
+                  }
+                },
+                error: function (jqXHR, textStatus, errorMessage) {
+                  alert('伺服器連線不穩定，請稍後再試!');
+                }
+            });
+            if ($('#' + sLongIndex + '_section').hasClass('open')) {
+              $('.accordionPart > section.grid-item').fadeTo('fast',0.2);
+              $('#response_textmsg_' + sIndex).focus();
+              $('#' + sLongIndex + '_section').fadeTo('fast',1);
+            }
+            else {
+              $('.accordionPart > section.grid-item').fadeTo('fast',1);
+            }
+
+            $grid.masonry('reloadItems');
+            $grid.masonry();
           }
         });
 			});
@@ -894,7 +938,6 @@ function insertAtCursor(myField, myValue) {
         myField.value += myValue;
     }
 }
-
 </script>
   <div class="content2-Box">
 	  <div class="path">目前位置：親師互動</div>
@@ -921,7 +964,7 @@ function insertAtCursor(myField, myValue) {
 							<button id="sumbit_btn" name="sumbit_btn" class="btn04" style="float:right;margin:0px;">確認</button>
 						</section>
             <div id="msg_content" style="display:none;">
-              <section v-for="(item, index) in Message" class="grid-item">
+              <section v-for="(item, index) in Message" v-bind:id="index + '_section'" class="grid-item">
                 <span class="del">&nbsp;</span>
                 <div v-bind:id="index" class="qa_title" v-bind:class="[matchClass(item.create_userid) ? 'delete' : '']">
   								<ul>
@@ -945,7 +988,7 @@ function insertAtCursor(myField, myValue) {
   							</div>
                 <div class="qa_content">
                   <ul v-for="(oReMsg, ReMsgIndx) in item.remsg">
-                    <li v-bind:id="'resmsg_'+ReMsgIndx">
+                      <li v-bind:id="'resmsg_'+ReMsgIndx">
                       <span class="name">{{oReMsg.remsg_create_user}}</span>
                       <span class="text" v-html="showContent(oReMsg.response_content)"></span>
                       <span class="time">{{oReMsg.remsg_create_time}}</span>

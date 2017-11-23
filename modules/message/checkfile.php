@@ -38,7 +38,7 @@
 
     default:
       $vRtn['STATUS'] = 'ERR';
-      $vRtn['MSG'] = '錯誤代碼: MD_MSG_UFx041';
+      $vRtn['MSG'] = '檔案格式錯誤。錯誤代碼: MD_MSG_UFx041';
 
       echo json_encode($vRtn);
       exit();
