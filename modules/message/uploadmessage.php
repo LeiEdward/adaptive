@@ -26,12 +26,12 @@
      // 判斷留言對象是單一還是群發
      if (false !== strpos($sToUserid, '>>>ALL')) {
         $sToUserid = str_replace('>>>ALL', '', $sToUserid);
-        $oSQLUplaodMessage->bindValue(':touser_id', NULL, PDO::PARAM_STR);
+        $oSQLUplaodMessage->bindValue(':touser_id', '', PDO::PARAM_STR);
         $oSQLUplaodMessage->bindValue(':togroup', $sToUserid, PDO::PARAM_STR);
       }
       else {
         $oSQLUplaodMessage->bindValue(':touser_id', $sToUserid, PDO::PARAM_STR);
-        $oSQLUplaodMessage->bindValue(':togroup', NULL, PDO::PARAM_STR);
+        $oSQLUplaodMessage->bindValue(':togroup', '', PDO::PARAM_STR);
       }
       $oSQLUplaodMessage->bindValue(':msg_type', '2', PDO::PARAM_STR); // msg_type:2 親師
       $oSQLUplaodMessage->bindValue(':msg_content', $sContent, PDO::PARAM_STR);

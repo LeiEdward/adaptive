@@ -233,7 +233,7 @@ function chooseCLASS($org){
        </div>
     </div>
   ');
-
+	// debugBAI('', 'chooseCLASS', '');
 }
 
 
@@ -271,6 +271,7 @@ function listUSER($org){
 		echo '</tr>';
 	}
 	echo "</table>";
+	// debugBAI('', 'listUSER', '');
 }
 
 function listAllExams_row($user_id){
@@ -333,7 +334,7 @@ function listAllExams_row($user_id){
   ';
 
 	echo implode( '', $reportHtml );
-
+	// debugBAI('', 'listAllExams_row', $reportHtml);
 }
 
 
@@ -466,6 +467,12 @@ function listAllExams_col($user_id){  //學生用
 	//$reportHtml[]='<div class="path">目前位置：診斷報告</div>';
 	if($_SESSION[userData]->access_level!=21){
 	$reportHtml[]='<div class="path">目前位置：診斷報告</div>';
+	$reportHtml[]='<div class="choice-title">診斷</div>';
+	$reportHtml[]='<ul class="choice work-cholic">';
+	$reportHtml[]='<li><a href="modules.php?op=modload&name=ExamResult&file=classReports" class="current"><i class="fa fa-caret-right"></i>診斷報告</a></li>';
+	$reportHtml[]='<li><a href="modules.php?op=modload&name=ExamResult&file=record_list"><i class="fa fa-caret-right"></i>診斷報告(CPS)</a></li>';
+	$reportHtml[]='</ul>';
+	$reportHtml[]='</div>';
 	}
 	$reportHtml[]='<div class="main-box">';
 	//170808，新增學年度下拉式選單。
@@ -525,7 +532,7 @@ function listAllExams_col($user_id){  //學生用
     </script>
   ';
 	echo implode( '', $reportHtml );
-
+// debugBAI('', 'listAllExams_col', $reportHtml);
 }
 
 function personExamResults($q_user_id, $q_cs_id, $report_for_pc){
@@ -619,6 +626,7 @@ function personExamResults($q_user_id, $q_cs_id, $report_for_pc){
 		$RedirectTo="modules.php?op=modload&name=LSA&file=creatITEM&cs_id=".$q_cs_id."&paper_vol=".$q_paper_vol."&user_id=".$q_user_id."&type=LSA&unit_item[0]=".$ac[0]."&unit_item[1]=".$ac[1]."&unit_item[2]=".$ac[2]."&unit_item[3]=".$ac[3];
 		echo '<center><br><br>【<a href="'.$RedirectTo.'" target="_blank">自我出題練習</a>】<br><br><br></center>';
 	}
+	// debugBAI('', 'personExamResults', $prt);
 }
 
 
@@ -684,6 +692,7 @@ function PrintOutpersonExamResults($q_user_id, $q_cs_id, $report_for_pc){
 		$RedirectTo="Location: modules.php?op=modload&name=".$module_name."&file=download2";
 		Header($RedirectTo);
 	}
+	// debugBAI('', 'PrintOutpersonExamResults', $prt);
 }
 
 

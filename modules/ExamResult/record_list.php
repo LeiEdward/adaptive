@@ -72,68 +72,72 @@
 <link rel="stylesheet" href="./modules/ExamResult/CPS/css/colorbox.css" />
 <!-- <link rel="stylesheet" href="./modules/ExamResult/CPS/css/jquery-ui.css" /> -->
 <!-- <link rel="Stylesheet" href="./modules/ExamResult/CPS/css/jquery-ui-1.7.1.custom.css" type="text/css" /> -->
-
 <script language="javascript">
-//顯示能力值
-function show_msg_box(getValue,getValue2){
-	$.ajax({
-		url: './modules/ExamResult/get_testResultsList.php',
-		data: {num:getValue,snum:getValue2,swType:'oneData'},
-		type:"POST",
-		error: function(xhr) {
-			//console.log(xhr);
-			alert('Ajax request 發生錯誤');
-		},
-		success: function(response) {
-			$('#show_msg_box').append(response).show();
-			$.colorbox({inline:true,href:"#show_msg_box", width:"50%",height:"80%",open:true,onClosed:function(){
-			$('#show_msg_box').html('').hide();
-			}});
-		}
-	});
-}
-
-//顯示總分數
-function show_total_box(getValue,getValue2){
-	$.ajax({
-		url: './modules/ExamResult/get_testResultsList.php',
-		data: {num:getValue,snum:getValue2,swType:'totalData'},
-		type:"POST",
-		error: function(xhr) {
-			//console.log(xhr);
-			//alert('Ajax request 發生錯誤');
-		},
-		success: function(response) {
-			$('#show_msg_box').append(response).show();
-			$.colorbox({inline:true,href:"#show_msg_box", width:"50%",height:"80%",open:true,onClosed:function(){
-			$('#show_msg_box').html('').hide();
-			}});
-		}
-	});
-}
-
-$(document).ready(function() {
-<?php
-	if($_GET['tr']!=''){
-	echo "$('#div_area_".$_GET['tr']."').slideDown('fase');";
+	//顯示能力值
+	function show_msg_box(getValue,getValue2){
+		$.ajax({
+			url: './modules/ExamResult/get_testResultsList.php',
+			data: {num:getValue,snum:getValue2,swType:'oneData'},
+			type:"POST",
+			error: function(xhr) {
+				//console.log(xhr);
+				alert('Ajax request 發生錯誤');
+			},
+			success: function(response) {
+				$('#show_msg_box').append(response).show();
+				$.colorbox({inline:true,href:"#show_msg_box", width:"50%",height:"80%",open:true,onClosed:function(){
+				$('#show_msg_box').html('').hide();
+				}});
+			}
+		});
 	}
-?>
-});
 
+	//顯示總分數
+	function show_total_box(getValue,getValue2){
+		$.ajax({
+			url: './modules/ExamResult/get_testResultsList.php',
+			data: {num:getValue,snum:getValue2,swType:'totalData'},
+			type:"POST",
+			error: function(xhr) {
+				//console.log(xhr);
+				//alert('Ajax request 發生錯誤');
+			},
+			success: function(response) {
+				$('#show_msg_box').append(response).show();
+				$.colorbox({inline:true,href:"#show_msg_box", width:"50%",height:"80%",open:true,onClosed:function(){
+				$('#show_msg_box').html('').hide();
+				}});
+			}
+		});
+	}
+
+	$(document).ready(function() {
+	<?php
+		if($_GET['tr']!=''){
+		echo "$('#div_area_".$_GET['tr']."').slideDown('fase');";
+		}
+	?>
+	});
 </script>
 </head>
 
 
 <div id="wrapper">
-
 <?php
 $outNum = 0;
-foreach($NameArray as $myKey => $myDSC){
+foreach($NameArray as $myKey => $myDSC) {
 ?>
 
 <!-- 單元 → 試題列表 -->
     <div class="content2-Box" id="div_area_<?php echo $myKey;?>">
     	<div class="path">目前位置：診斷報告(CPS)</div>
+			<div class="choice-box">
+      <div class="choice-title">診斷</div>
+        <ul class="choice work-cholic">
+      	  <li><a href="modules.php?op=modload&name=ExamResult&file=classReports"><i class="fa fa-caret-right"></i>診斷報告</a></li>
+      		<li><a href="modules.php?op=modload&name=ExamResult&file=record_list" class="current"><i class="fa fa-caret-right"></i>診斷報告(CPS)</a></li>
+        </ul>
+ 		 </div>
     	<div class="main-box">
     	<div class="title01"><?php echo $user_id;?>歷來測驗單元</div>
     	<div class="table_scroll">

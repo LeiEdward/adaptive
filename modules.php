@@ -54,6 +54,7 @@ $search_count2->bindValue(':user_id', $user_id, PDO::PARAM_STR);
 $search_count2->bindValue(':read_mk', '0', PDO::PARAM_INT);
 $search_count2->execute();
 $row_count_unread = $search_count2->fetch();
+
 $_SESSION['msg_count'] = $row_count_unread["num"];
 if( $_GET[file]=='viewErrorsBN' OR $_REQUEST[screen]=='all' OR $_REQUEST[scr]=='all'){
 	;
@@ -64,11 +65,11 @@ if( $_GET[file]=='viewErrorsBN' OR $_REQUEST[screen]=='all' OR $_REQUEST[scr]=='
 }
 
 echo '<div id="content" class="content-Box">';
+
 //my_filter 在 "include/security_function.php";
 $op= isset($_REQUEST['op']) ? my_filter($_REQUEST['op'], "string") : '';
 $my_code_path= isset($_REQUEST['name']) ? my_filter($_REQUEST['name'], "string") : '';
 $my_code_filename= isset($_REQUEST['file']) ? my_filter($_REQUEST['file'], "string") : '';
-user_historyadd($_SERVER['QUERY_STRING'], $my_code_filename, $user_data);
 
 if($op=='modload'){
 	if (ereg("\.\.",$name) || ereg("\.\.",$file)) {
@@ -77,7 +78,12 @@ if($op=='modload'){
 	} else {
 		$exec_file="modules/".$my_code_path."/".$my_code_filename.".php";
 		if(file_exists($exec_file)){
+			//檢查程式執行時間
+			$code_time_start = microtime(true);
+			//執行程式
 			include($exec_file);
+			$code_time_end = microtime(true);
+			$code_spent_time = $code_time_end - $code_time_start;
 		}else{
 			echo "請不要任意輸入網址！！";
 		}
@@ -104,70 +110,40 @@ if($op=='modload'){
 <script src="scripts/sweetalert2/sweetalert2.min.js"></script>
 <link rel="stylesheet" href="scripts/sweetalert2/sweetalert2.min.css">
 <?php
-if($user_data->access_level < 10){
-?>
-<script type="text/javascript">
-var url = 'modules.php?op=modload&';
-swal({
-	title: '關於我',
-	html: '<div ><img src="images/role/Girl04.png"  style="float:left;width:40%;height:40%;vertical-align:middle;">'+
-		'<div class="class-root-box" >我想開始挑戰新的任務  <a class="btn07" href="'+ url +'name=assignMission&file=mission_action">GO！</a></div>'+
-		'<div class="class-root-box" >回到挑戰上一次的任務  <a href="'+ url +'name=indicateTest&file=indicateAdaptiveTest&mission_sn=2766" class="btn07">GO！</a></div>'+
-		'<div class="class-root-box" >同學有問題，我來回答   <a href="'+ url +'name=learn_video&file=video_askquestion#parentHorizontalTab4" class="btn07">GO！</a></div>'+
-		'</div>',
-	showCloseButton: true,
-	showConfirmButton: false
-});
-
-$(function() {
-	// 171012，即時訊息移動至class-rank，首頁留連結框。
-    //$.unblockUI();
-    $.blockUI({
-            theme: true,
-            title: '<a href="modules.php?op=modload&name=role&file=role_class_rank"><p id="role_head">查看同學動態GO!</p></a>',
-            //draggable: true,
-            message: ' ', //設定要顯示的div內容
-            fadeIn: 700,
-            fadeOut: 700,
-            // timeout: 2000,  //設定顯示時間，這邊註解掉
-            showOverlay: false, //是否讓主畫面變暗
-            centerY: false,
-            themedCSS: {
-                width: '200px',
-                top: '18%',
-                // bottom: '10px',
-                left: '65%',
-                // right: '5%', //讓視窗靠左下，因此不設定右邊數值
-                border: 'none',
-                padding: '5px',
-                backgroundColor: '#AFADAD',
-                '-webkit-border-radius': '10px',
-                '-moz-border-radius': '10px',
-                opacity: .8,
-                color: 'black',
-                cursor: 'default' //原本預設為wait(一直轉圈圈)，改為default。
-            }
-
-     });
-});
-
-</script>
+	if($user_data->access_level < 10){
+	?>
+	<script type="text/javascript">
+	var url = 'modules.php?op=modload&';
+	swal({
+		title: '送給同學一個點數',
+		html: '<div style="text-align:left;"><img src="images/role/Girl04.png"  style="float:left;width:40%;height:40%;vertical-align:middle;">'+
+			'1.只要看完影片、答對題目可以拿到點數！(點數的計算:第一次為4點，第二次後獎勵折半計算)<br>'+
+			'<img src="images/role/coin2.png"><img src="images/role/coin2.png"><img src="images/role/coin2.png"><img src="images/role/coin2.png"><br>'+
+			'2.你可以在同學回答自己問題的地方，送同學點數(點數的計算:1點)！<br>'+
+			'<img src="images/role/coin2.png"><br>'+
+			'3.可以在同學動態中看到同學們的最新挑戰、點數、老師贈送的鼓勵點數'+
+			'</div>',
+		showCloseButton: false,
+		showConfirmButton: true
+	});
+	</script>
 <?php }elseif ($user_data->access_level==21){?>
-<script type="text/javascript">
-var url = 'modules.php?op=modload&';
-swal({
-	title: '選擇要進行的教學模式',
-	html: '<div ><img src="images/role/Man.png"  style="float:left;width:30%;height:30%;vertical-align:middle;">'+
-		'<div class="class-root-box" ><a href="'+ url +'name=assignMission&file=assignment2" class="btn07">翻轉教室 <i class="fa fa-arrow-right"></i></a></div>'+
-		'<div class="class-root-box" ><a href="'+ url +'name=assignMission&file=assignment3" class="btn07" >適性診斷與補救教學(縱貫) <i class="fa fa-arrow-right"></i></a></div>'+
-		'<div class="class-root-box" ><a href="'+ url +'name=assignMission&file=assignment" class="btn07" >適性診斷與補救教學(單元) <i class="fa fa-arrow-right"></i></a></div>'+
-		'</div>',
-	showCloseButton: true,
-	showConfirmButton: false
-});
-</script>
-<?php }?>
+	<script type="text/javascript">
+	var url = 'modules.php?op=modload&';
+	swal({
+		title: '獎勵制度公告',
+		html: '<div style="text-align:left;"><img src="images/role/Man.png"  style="float:left;width:40%;height:40%;vertical-align:middle;">'+
+			'1.系統會依同學的學習類型自動給予點數，例如：觀看完影片、答對題目等，點數的計算為第一次為4點，第二次後獎勵折半計算<br>'+
+			'<img src="images/role/coin2.png"><img src="images/role/coin2.png"><img src="images/role/coin2.png"><img src="images/role/coin2.png"><br>'+
+			'2.教師可以在班級管理的學生管理中依學生表現給予鼓勵的點數(點數的計算:1點)<br>'+
+			'<img src="images/role/coin2.png">'+
+			'</div>',
+		showCloseButton: true,
+		showConfirmButton: false
+	});
+	</script>
 <?php
+	}
 	echo '<div class="content2-Box">
     	<div class="path">目前位置：<a href="modules.php?op=main">首頁</a></div>
 		<div style="text-align:center; font-size:24px; color:#1c1c1c; padding-bottom:30px; line-height:150%;">';
@@ -176,6 +152,8 @@ swal({
 	$map_new_url = "'modules/D3/app/index_view.php?aa=".base64_encode($_SESSION['user_id'])."'";
 	if($user_data->access_level < 10 || $user_data->access_level==21){  //暫定等級30以下使用此畫面
 		echo '
+		<script  src="https://code.jquery.com/ui/1.12.1/jquery-ui.js" integrity="sha256-T0Vest3yCU7pafRw9r+settMBX6JkKN06dqBnpQ8d30=" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/start/jquery-ui.css">
 		<ul class="idx-menu">
        		<li ><a><div class="idx-menu-data" >知識結構學習<br><div class="btn01" id="menu" style="cursor:pointer;">進入查看</div></div></a></li>
        		<li><a href="modules.php?op=modload&name=BayesianTest&file=index"><div class="idx-menu-data">智慧適性診斷<br><div class="btn01">進入查看</div></div></a></li>
@@ -246,8 +224,10 @@ if( $_GET['file']=='viewErrorsBN' OR $_REQUEST['screen']=='all'){
 }elseif($_REQUEST['screen'] == 'frame'){
 	;
 }else{
-	//修改by 彥鈞 105.10.2
-	echo '<div class="bottom-pto"><img src="images/content-bg.png" title="'.$mem_usage.'"></div>';
+	//修改by 彥鈞 106.11.22
+	//.$_SERVER["REQUEST_URI"].')-('
+	//_POST
+	echo '<div class="bottom-pto"><img src="images/content-bg.png" title="('.sprintf("%01.4f",$code_spent_time).')-('.$mem_usage.')"></div>';
 	echo '</div>';
 	require_once "feet_new.php";
 }
@@ -259,36 +239,4 @@ function create_password($pw_length ='6'){
 		$randpwd .= chr(mt_rand(33, 126));
 	}
 	return $randpwd;
-}
-
-
-function user_historyadd($server, $filename, $user_data){
-	global $dbh;
-	$time = date ("YmdHis");
-	if($filename !='') $qs_str = explode($filename, $server);
-	if($qs_str[1] != '') $action = $qs_str[1];
-	else $action = 'none';
-
-	if($server == 'op=main') $pro_no ='A001';
-	else{
-
-		$search = $dbh->prepare("SELECT pro_no FROM program_info WHERE pro_path LIKE :filename");
-		$search->bindValue(':filename', '%file='.$filename, PDO::PARAM_STR);
-		$search->execute();
-		$row_data = $search->fetch();
-		$pro_no = $row_data["pro_no"];
-	}
-	if($pro_no !=''){
-		$result = $dbh->prepare("INSERT INTO user_history (date, user_id, action, pro_no, type, organization_id)
-			VALUES (:adddate, :user_id, :action, :pro_no, :pro_type, :org_id)");
-
-		$result->bindValue(':adddate', $time, PDO::PARAM_STR);
-		$result->bindValue(':user_id', $user_data->user_id, PDO::PARAM_STR);
-		$result->bindValue(':action', $action, PDO::PARAM_INT);
-		$result->bindValue(':pro_no', $pro_no, PDO::PARAM_STR);
-		$result->bindValue(':pro_type', 'login', PDO::PARAM_STR);
-		$result->bindValue(':org_id', $user_data->organization_id, PDO::PARAM_STR);
-		$result->execute();
-	}
-
 }

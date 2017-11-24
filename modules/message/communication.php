@@ -9,8 +9,8 @@
   // 取得 user 資料
   $vUserData = get_object_vars($_SESSION['user_data']);
 
-  $vParentGroup = array();
-  $vParentGroup = getGroup();
+  $vGroup = array();
+  $vGroup = getGroup();
 
   $vTo = array();
   $vTo = getMessagetoWHO();
@@ -42,13 +42,13 @@
         $oSQLParentInfo->execute();
         $vParentInfo = $oSQLParentInfo->fetchAll(\PDO::FETCH_ASSOC);
 
-        $vParentGroup = array();
+        $vGroup = array();
         foreach ($vParentInfo as $vInfo) {
-          // $vParentGroup['info'] 家長發送的訊息對象
-          $vParentGroup['info'][] = array('organization_id' => $vInfo['organization_id'],
+          // $vGroup['info'] 家長發送的訊息對象
+          $vGroup['info'][] = array('organization_id' => $vInfo['organization_id'],
                                         'grade' => $vInfo['grade'],
                                         'class' => $vInfo['class']);
-          $vParentGroup['togroup'][] = '['.$vInfo['organization_id'].']'.'['.$vInfo['grade'].']'.'['.$vInfo['class'].']';
+          $vGroup['togroup'][] = '['.$vInfo['organization_id'].']'.'['.$vInfo['grade'].']'.'['.$vInfo['class'].']';
         }
         break;
 
@@ -57,44 +57,39 @@
         $sGrade = $vUserData['grade'];
         $sClass = $vUserData['class_name'];
 
-        $vParentGroup['togroup'][] = '['.$sOrganizeID.']'.'['.$sGrade.']'.'['.$sClass.']';
+        $vGroup['togroup'][] = '['.$sOrganizeID.']'.'['.$sGrade.']'.'['.$sClass.']';
         break;
     }
 
-    return $vParentGroup;
+    return $vGroup;
   }
 
   function getMessage() {
-    global $dbh, $vUserData, $vParentGroup;
+    global $dbh, $vUserData, $vGroup;
 
     $vMessageData = array();
     $sUserID = $vUserData['user_id'];
 
-    $sSQLParentGroup = '';
-    if (!empty($vParentGroup['togroup'])) {
-      foreach ($vParentGroup['togroup'] as $sGroupStr) {
-        $sSQLParentGroup .= " OR (message_master.togroup LIKE '%$sGroupStr%' AND message_master.delete_flag = '0') ";
+    $sGroup = '';
+    if (!empty($vGroup['togroup'])) {
+      foreach ($vGroup['togroup'] as $sGroupStr) {
+// debugBai('','',$sGroupStr);
+        $sGroup .= " OR (message_master.togroup LIKE '%$sGroupStr%' AND message_master.delete_flag = '0') ";
       }
     }
-    $sSQLMessage = "SELECT * FROM message_master
+    $sSQLMessage = "SELECT *, CONCAT(message_master.togroup,message_master.touser_id,message_master.create_user) AS CanSee FROM message_master
       LEFT JOIN message_response ON message_master.msg_sn = message_response.message_sn
       LEFT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
-      AND message_response.remsg_delete_flag = '0'
-      OR (message_master.touser_id = '$sUserID' AND message_master.delete_flag = '0')
-      OR (message_master.create_user ='$sUserID' AND message_master.delete_flag = '0')
-      $sSQLParentGroup
+      $sGroup
       UNION
-      SELECT * FROM message_master
+      SELECT *, CONCAT(message_master.togroup,message_master.touser_id,message_master.create_user) AS CanSee FROM message_master
       RIGHT JOIN message_response ON message_master.msg_sn = message_response.message_sn
       RIGHT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
       WHERE message_master.msg_type = '2'
       AND message_master.delete_flag = '0'
-      AND message_response.remsg_delete_flag = '0'
-      OR (message_master.touser_id = '$sUserID' AND message_master.delete_flag = '0')
-      OR (message_master.create_user ='$sUserID' AND message_master.delete_flag = '0')
-      $sSQLParentGroup
+      $sGroup
       ORDER BY msg_sn DESC";
       // debugBai('','',$sSQLMessage);
     $oMessage = $dbh->prepare($sSQLMessage);
@@ -105,7 +100,7 @@
   }
 
   function getMessagetoWHO() {
-    global $dbh, $vUserData, $vParentGroup;
+    global $dbh, $vUserData, $vGroup, $sToAll;
 
     $vTo = array();
     $sACL = $vUserData['access_level'];
@@ -117,7 +112,7 @@
         $vGrade = array();
         $vClass = array();
         $vOrganizeID = array();
-        foreach ($vParentGroup['info'] as $vPGroup) {
+        foreach ($vGroup['info'] as $vPGroup) {
           $vOrganizeID[] = $vPGroup['organization_id'];
           $vGrade[] = $vPGroup['grade'];
           $vClass[] = $vPGroup['class'];
@@ -126,7 +121,7 @@
         $sGrade = implode("','", $vGrade);
         $sClass = implode("','", $vClass);
 
-        $sParentGroup = implode(",", $vParentGroup['togroup']);
+        $sParentGroup = implode(",", $vGroup['togroup']);
         $sToAll = $sParentGroup.'>>>ALL';
         $sSQLTO = "SELECT *, user_id, user_id as towho FROM user_info
           WHERE organization_id IN ('$sOrganizeID')
@@ -174,15 +169,31 @@
   }
 
   function handleData($vMessageData) {
-    global $vUserData;
+    global $vUserData, $vGroup;
 
     $sUserID = $vUserData['user_id'];
     $sACL = $vUserData['access_level'];
-
+    // debugBai('','',$sCanSeeGroup);
     $vNewData = array();
     foreach ($vMessageData as $key => $vMsg) {
       // 因為資料集是UNION起來，所以要去除重複的編號
       if (!isset($vNewData['msg_'.$vMsg['msg_sn']])) {
+
+        // echo $vMsg['CanSee'].'<br>';
+        if (FALSE === strpos($vMsg['CanSee'], $sUserID)) {
+          if (!empty($vGroup['togroup'])) {
+
+            $iCount = 0;
+            $iMax = Count($vGroup['togroup']);
+            foreach ($vGroup['togroup'] as $sCanSeeGroup) {
+              if (FALSE === strpos($vMsg['CanSee'], $sCanSeeGroup)) {
+                $iCount++;
+              }
+              if ($iMax == $iCount) continue 2;
+            }
+          }
+        }
+
         $time1 = date("Y-m-d H:i:s");
         $time2 = substr($vMsg['create_time'], 0, 16);
         $sCreateTime = '';
@@ -350,7 +361,7 @@
   .h125 {height:125px;}
   .del {position:absolute;top:0px;right:0px;width:10px;height:10px;z-index:10;cursor:pointer;}
   .privatemsg {color:rgba(0, 150, 0, 1);font-size:14px;font-style:normal;}
-
+  /*. {width:1260px;margin:0px auto;}*/
   /* RWD */
   @media screen and (max-width: 500px) {
     .accordionPart > section.grid-item {width:100%;float:left;}
@@ -369,7 +380,7 @@
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
   var oReMsg = {};
   var sDelFile = '';
-  // console.log(oItem);
+
   $(function() {
 		$.LoadingOverlay('show');
 
@@ -509,6 +520,14 @@
           deletefile: sDelFile
         };
 
+        var sReg = /(\\)|(\')|(\")/g;
+        var vMathErrorChart = oMessage.msg_content.match(sReg);
+        if (null != vMathErrorChart && 0 < vMathErrorChart.length) {
+          // oResponse.response_content = oResponse.response_content.replace(sReg, '');
+          alert('內容有不合法的特殊字元!');
+          return;
+        }
+
         if ('' == oMessage.msg_content && '0' == oMessage.attachefile) {
           alert('留言失敗，沒有內容!');
           return;
@@ -550,12 +569,12 @@
           remsg_delete_flag: '0'
         };
 
-        try {
-            $.parseJSON(oResponse.response_content);
-        }
-        catch(err) {
-          oResponse.ERR = '有不合法的特殊字元，請確認內容';
-          alert(oResponse.ERR);
+        var sReg = /(\\)|(\')|(\")/g;
+        var vMathErrorChart = oResponse.response_content.match(sReg);
+        if (null != vMathErrorChart && 0 < vMathErrorChart.length) {
+          // oResponse.response_content = oResponse.response_content.replace(sReg, '');
+          alert('內容有不合法的特殊字元!');
+          return;
         }
 
         if ('' === oResponse.response_content || !!oResponse.ERR) return;
