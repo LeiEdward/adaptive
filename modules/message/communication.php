@@ -73,10 +73,10 @@
     $sGroup = '';
     if (!empty($vGroup['togroup'])) {
       foreach ($vGroup['togroup'] as $sGroupStr) {
-// debugBai('','',$sGroupStr);
         $sGroup .= " OR (message_master.togroup LIKE '%$sGroupStr%' AND message_master.delete_flag = '0') ";
       }
     }
+
     $sSQLMessage = "SELECT *, CONCAT(message_master.togroup,message_master.touser_id,message_master.create_user) AS CanSee FROM message_master
       LEFT JOIN message_response ON message_master.msg_sn = message_response.message_sn
       LEFT JOIN message_fileattached ON message_master.msg_sn = message_fileattached.message_sn
@@ -173,14 +173,17 @@
 
     $sUserID = $vUserData['user_id'];
     $sACL = $vUserData['access_level'];
-    // debugBai('','',$sCanSeeGroup);
+
     $vNewData = array();
     foreach ($vMessageData as $key => $vMsg) {
-      // 因為資料集是UNION起來，所以要去除重複的編號
+
+      // 主訊息，因為資料集是UNION起來，所以要去除重複的編號
       if (!isset($vNewData['msg_'.$vMsg['msg_sn']])) {
 
-        // echo $vMsg['CanSee'].'<br>';
+        // $vMsg['CanSee'] 如果找不到對象是自己,訊息可能是群發
         if (FALSE === strpos($vMsg['CanSee'], $sUserID)) {
+
+          // 確定是否有群發
           if (!empty($vGroup['togroup'])) {
 
             $iCount = 0;
@@ -194,26 +197,17 @@
           }
         }
 
-        $time1 = date("Y-m-d H:i:s");
-        $time2 = substr($vMsg['create_time'], 0, 16);
-        $sCreateTime = '';
-        if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60*60*24))) {
-          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60*60*24)).'日';
+        switch($sACL) {
+          case USER_PARENTS: // 家長只能看見自己發的訊息，不能看到其他家長的
+           if ($vMsg['create_user'] != $sUserID && USER_PARENTS == id2UserLevel($vMsg['create_user'])) continue 2;
+            break;
         }
-        else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60*60))) {
-          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60*60)).'小時';
-        }
-        else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60))) {
-          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60)).'分';
-        }
-        else if (1 <= floor((strtotime($time1) - strtotime($time2)))) {
-          $sCreateTime = floor((strtotime($time1) - strtotime($time2))).'秒';
-        }
+
         $vNewData['msg_'.$vMsg['msg_sn']]['msg_sn'] = $vMsg['msg_sn'];
         $vNewData['msg_'.$vMsg['msg_sn']]['touser_name'] = id2uname($vMsg['touser_id']);
         $vNewData['msg_'.$vMsg['msg_sn']]['create_user'] = id2uname($vMsg['create_user']);
         $vNewData['msg_'.$vMsg['msg_sn']]['create_userid'] = $vMsg['create_user'];
-        $vNewData['msg_'.$vMsg['msg_sn']]['create_time'] = $sCreateTime;
+        $vNewData['msg_'.$vMsg['msg_sn']]['create_time'] = getPassTime($vMsg['create_time']);
         $vNewData['msg_'.$vMsg['msg_sn']]['msg_content'] = str_replace(array("\r", "\n", "\r\n", "\n\r"), '<br>', $vMsg['msg_content']);
         $vNewData['msg_'.$vMsg['msg_sn']]['attachefile'] = $vMsg['attachefile'];
         $vNewData['msg_'.$vMsg['msg_sn']]['read_mk'] = $vMsg['read_mk'];
@@ -231,6 +225,8 @@
           }
         }
       }
+
+      // 主訊息附加檔案
       if (isset($vMsg['file_sn'])) {
         switch($vMsg['filetype']) {
           case 'image':
@@ -245,6 +241,8 @@
             break;
         }
       }
+
+      // 回覆訊息
       if ($vMsg['response_sn'] && !isset($vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']])) {
         // 刪除不顯示
         if ('1' == $vMsg['remsg_delete_flag']) continue;
@@ -253,34 +251,40 @@
         if (!empty($vMsg['res_resmsgto_user']) && $sUserID != $vMsg['res_resmsgto_user'] && $sUserID != $vMsg['remsg_create_user']) continue;
 
         // 只有發訊息者可以看到全部的訊息，接收者只能看見本身的訊息與發訊息者的對話
-        if ($sUserID != $vMsg['create_user'] && $sUserID != $vMsg['remsg_create_user'] && $vMsg['create_user'] != $vMsg['remsg_create_user']) continue;
+        // if ($sUserID != $vMsg['create_user'] && $sUserID != $vMsg['remsg_create_user'] && $vMsg['create_user'] != $vMsg['remsg_create_user']) continue;
 
-        $time1 = date("Y-m-d H:i:s");
-        $time2 = substr($vMsg['remsg_create_time'], 0, 16);
-        $sCreateTime = '';
-        if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60*60*24))) {
-          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60*60*24)).'日';
-        }
-        else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60*60))) {
-          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60*60)).'小時';
-        }
-        else if (1 <= floor((strtotime($time1) - strtotime($time2))/ (60))) {
-          $sCreateTime = floor((strtotime($time1) - strtotime($time2))/ (60)).'分';
-        }
-        else if (1 <= floor((strtotime($time1) - strtotime($time2)))) {
-          $sCreateTime = floor((strtotime($time1) - strtotime($time2))).'秒';
-        }
         $vNewData['msg_'.$vMsg['msg_sn']]['response_total']++;
         $vNewData['msg_'.$vMsg['msg_sn']]['remsgindex'] = $vMsg['response_sn'];
         $vNewData['msg_'.$vMsg['msg_sn']]['remsg'][$vMsg['response_sn']] = array('response_content' => str_replace(array("\r", "\n", "\r\n", "\n\r"), ' ', $vMsg['response_content']),
                                                                                  'remsg_create_user' => id2uname($vMsg['remsg_create_user']),
                                                                                  'remsg_create_userid' => $vMsg['remsg_create_user'],
                                                                                  'res_resmsgto_user' => $vMsg['res_resmsgto_user'],
-                                                                                 'remsg_create_time' => $sCreateTime);
+                                                                                 'remsg_create_time' => getPassTime($vMsg['remsg_create_time']));
       }
     }
     return $vNewData;
   }
+
+function getPassTime($sTime) {
+  $sNowTime = date("Y-m-d H:i:s");
+  $sTime = substr($sTime, 0, 16);
+
+  $sCreateTime = '';
+  if (1 <= floor((strtotime($sNowTime) - strtotime($sTime))/ (60*60*24))) {
+    $sCreateTime = floor((strtotime($sNowTime) - strtotime($sTime))/ (60*60*24)).'日';
+  }
+  else if (1 <= floor((strtotime($sNowTime) - strtotime($sTime))/ (60*60))) {
+    $sCreateTime = floor((strtotime($sNowTime) - strtotime($sTime))/ (60*60)).'小時';
+  }
+  else if (1 <= floor((strtotime($sNowTime) - strtotime($sTime))/ (60))) {
+    $sCreateTime = floor((strtotime($sNowTime) - strtotime($sTime))/ (60)).'分';
+  }
+  else if (1 <= floor((strtotime($sNowTime) - strtotime($sTime)))) {
+    $sCreateTime = floor((strtotime($sNowTime) - strtotime($sTime))).'秒';
+  }
+
+  return $sCreateTime;
+}
 ?>
 <!DOCTYPE HTML>
 <html>
@@ -740,12 +744,6 @@
               var oRtn = JSON.parse(sRtn);
               if ('SUCCESS' === oRtn.STATUS) {
                 location.reload();
-                // vueMessage.delremsg({
-                //   MsgIndex: sMsgIndex,
-                //   ReMsgIndex: sReMsgIndex
-                // });
-                // $('#response_textmsg_' + sIndex).val('');
-                // $grid.masonry('reloadItems');
               }
               else {
                 alert(oRtn.MSG);
@@ -761,7 +759,7 @@
       $('body').on('change', '.toolbar > li > i > input', function (e) {
         if (typeof this.files[0] === 'undefined') return;
 
-        // 給後端驗證
+        // 給後端驗證,故marked
         // var vPassType = ['png','jpg','jpeg','bmp','gif','doc','docx','xls','xlsx','ppt','pptx','txt','pdf'];
         var filename = this.files[0].name;
         var filetype = this.files[0].type;
