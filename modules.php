@@ -159,6 +159,7 @@ if($op=='modload'){
        		<li><a href="modules.php?op=modload&name=BayesianTest&file=index"><div class="idx-menu-data">智慧適性診斷<br><div class="btn01">進入查看</div></div></a></li>
        		<li><a href="'.$CR_url.'"><div class="idx-menu-data">互動式學習<br><div class="btn01">進入查看</div></div></a></li>
        		<li><a href="http://210.240.189.1/CPS/login.php?aa='.$cps_encode.'&stuid='.$_SESSION['user_id'].'" target="_blank" ><div class="idx-menu-data">PISA合作問題解決能力<br><div class="btn01">進入查看</div></div></a></li>
+					<li><a href="http://210.240.189.1/GC_assessment/login.php?aa='.$cps_encode.'&stuid='.$_SESSION['user_id'].'" target="_blank" ><div class="idx-menu-data">全球競合力<br><div class="btn01">進入查看</div></div></a></li>
        </ul>
     </div>';
     	echo '<div id="dialog-message" title="科目選單" style="display:none;">
