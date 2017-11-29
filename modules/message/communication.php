@@ -29,39 +29,128 @@
     global $dbh, $vUserData;
 
     $sACL = $vUserData['access_level'];
+    $sUserID = $vUserData['user_id'];
 
     switch($sACL) {
       case USER_PARENTS:  // 家長身分
-        $sUserID = $vUserData['user_id'];
 
-        $sSQLParentInfo = "SELECT * FROM user_family
+        $sSQLGroup = "SELECT * FROM user_family
           LEFT JOIN user_info ON user_family.user_id = user_info.user_id
           WHERE user_family.fuser_id = '$sUserID'";
 
-        $oSQLParentInfo = $dbh->prepare($sSQLParentInfo);
-        $oSQLParentInfo->execute();
-        $vParentInfo = $oSQLParentInfo->fetchAll(\PDO::FETCH_ASSOC);
-
-        $vGroup = array();
-        foreach ($vParentInfo as $vInfo) {
-          // $vGroup['info'] 家長發送的訊息對象
-          $vGroup['info'][] = array('organization_id' => $vInfo['organization_id'],
-                                        'grade' => $vInfo['grade'],
-                                        'class' => $vInfo['class']);
-          $vGroup['togroup'][] = '['.$vInfo['organization_id'].']'.'['.$vInfo['grade'].']'.'['.$vInfo['class'].']';
-        }
+        $sSQLGroup = $dbh->prepare($sSQLGroup);
+        $sSQLGroup->execute();
+        $vGroupInfo = $sSQLGroup->fetchAll(\PDO::FETCH_ASSOC);
         break;
 
       case USER_TEACHER:
-        $sOrganizeID = $vUserData['organization_id'];
-        $sGrade = $vUserData['grade'];
-        $sClass = $vUserData['class_name'];
+        $sNowSeme = getYearSeme();
 
-        $vGroup['togroup'][] = '['.$sOrganizeID.']'.'['.$sGrade.']'.'['.$sClass.']';
+        $sSQLGroup = "SELECT * FROM seme_teacher_subject
+          WHERE seme_year_seme = '$sNowSeme'
+          AND teacher_id = '$sUserID'";
+
+        $sSQLGroup = $dbh->prepare($sSQLGroup);
+        $sSQLGroup->execute();
+        $vGroupInfo = $sSQLGroup->fetchAll(\PDO::FETCH_ASSOC);
+
+        // $sOrganizeID = $vUserData['organization_id'];
+        // $sGrade = $vUserData['grade'];
+        // $sClass = $vUserData['class_name'];
+        //
+        // $vGroup['togroup'][] = '['.$sOrganizeID.']'.'['.$sGrade.']'.'['.$sClass.']';
         break;
     }
 
+    $vGroup = array();
+    foreach ($vGroupInfo as $vInfo) {
+      // $vGroup['info'] 家長發送的訊息對象
+      $vGroup['info'][] = array('organization_id' => $vInfo['organization_id'],
+                                'grade' => $vInfo['grade'],
+                                'class' => $vInfo['class']);
+      $vGroup['togroup'][] = '['.$vInfo['organization_id'].']'.'['.$vInfo['grade'].']'.'['.$vInfo['class'].']';
+    }
+
     return $vGroup;
+  }
+
+  function getMessagetoWHO() {
+    global $dbh, $vUserData, $vGroup, $sToAll;
+
+    if (empty($vGroup)) return array();
+
+    $vGrade = array();
+    $vClass = array();
+    $vOrganizeID = array();
+    foreach ($vGroup['info'] as $vInfo) {
+      $vOrganizeID[] = $vInfo['organization_id'];
+      $vGrade[] = $vInfo['grade'];
+      $vClass[] = $vInfo['class'];
+    }
+    $sOrganizeID = implode("','", $vOrganizeID);
+    $sGrade = implode("','", $vGrade);
+    $sClass = implode("','", $vClass);
+
+    $sToAllGroup = implode(",", $vGroup['togroup']);
+    $sToAll = $sToAllGroup.'>>>ALL';
+    // echo $sToAll;
+    $sACL = $vUserData['access_level'];
+    switch($sACL) {
+      // Parents to Teacher
+      case USER_PARENTS:
+        $sSQLTO = "SELECT *, teacher_id, teacher_id as towho FROM seme_teacher_subject
+          LEFT JOIN user_info ON user_info.user_id = seme_teacher_subject.teacher_id
+          WHERE seme_teacher_subject.organization_id IN ('$sOrganizeID')
+          AND seme_teacher_subject.grade IN ('$sGrade')
+          AND seme_teacher_subject.class IN ('$sClass')
+          AND seme_teacher_subject.teacher_id LIKE '%-t%'
+          AND user_info.used = '1'
+          GROUP by user_info.user_id";
+        break;
+
+      // Teacher to Parents
+      case USER_TEACHER:
+        $sSQLTO = "SELECT *, user_family.fuser_id as towho FROM user_info
+          LEFT JOIN user_family ON user_info.user_id = user_family.user_id
+          WHERE user_info.organization_id IN ('$sOrganizeID')
+          AND user_info.grade IN ('$sGrade')
+          AND user_info.class IN ('$sClass')
+          AND user_info.used = '1'
+          AND LENGTH(user_family.user_id) > 4
+          GROUP by user_family.fuser_id";
+        break;
+    }
+    // echo $sSQLTO;
+    $oTO = $dbh->prepare($sSQLTO);
+    $oTO->execute();
+    $vTOWHO = $oTO->fetchAll(\PDO::FETCH_ASSOC);
+
+    $vTo = array();
+    if (!empty($vTOWHO) && is_array($vTOWHO)) {
+      sort($vTOWHO);
+
+      $vTo = array();
+      $vTo[] = '<select id="sel_parent">';
+      if (1 < count($vTOWHO)) {
+        $vTo[] =   '<option value="'.base64_encode($sToAll).'">全部</option>';
+      }
+      $sGradeClass = '';
+      foreach($vTOWHO as $vWHO) {
+        // $sToName = id2uname($vWHO['user_id']);
+        $sToName = id2uname($vWHO['towho']);
+        if ($sGradeClass != $vWHO['grade'].$vWHO['class']) {
+          if ('' !== $sGradeClass) {
+            $vTo[] = '</optgroup>';
+          }
+          $sGradeClass = $vWHO['grade'].$vWHO['class'];
+          $vTo[] = '<optgroup label="'.$vWHO['grade'].'年'.$vWHO['class'].'班">';
+        }
+        $vTo[] = '<option value="'.base64_encode($vWHO['towho']).'">'.$sToName.' </option>';
+      }
+      $vTo[] = '</select>';
+    }
+
+    return $vTo;
   }
 
   function getMessage() {
@@ -99,75 +188,6 @@
     return $vMessageData;
   }
 
-  function getMessagetoWHO() {
-    global $dbh, $vUserData, $vGroup, $sToAll;
-
-    $vTo = array();
-    $sACL = $vUserData['access_level'];
-
-    switch($sACL) {
-      // Parents to Teacher
-      case USER_PARENTS:
-        $sTitle = '';
-        $vGrade = array();
-        $vClass = array();
-        $vOrganizeID = array();
-        foreach ($vGroup['info'] as $vPGroup) {
-          $vOrganizeID[] = $vPGroup['organization_id'];
-          $vGrade[] = $vPGroup['grade'];
-          $vClass[] = $vPGroup['class'];
-        }
-        $sOrganizeID = implode("','", $vOrganizeID);
-        $sGrade = implode("','", $vGrade);
-        $sClass = implode("','", $vClass);
-
-        $sParentGroup = implode(",", $vGroup['togroup']);
-        $sToAll = $sParentGroup.'>>>ALL';
-        $sSQLTO = "SELECT *, user_id, user_id as towho FROM user_info
-          WHERE organization_id IN ('$sOrganizeID')
-          AND grade IN ('$sGrade')
-          AND class IN ('$sClass')
-          AND user_id LIKE '%-t%'
-          AND used = '1'";
-        break;
-
-      // Teacher to Parents
-      case USER_TEACHER:
-        $sTitle = ''; // 給家長
-        $sGrade = $vUserData['grade'];
-        $sClass = $vUserData['class_name'];
-        $sSchool = $vUserData['organization_id'];
-        $sToAll = "[$sSchool][$sGrade][$sClass]>>>ALL";
-        $sSQLTO = "SELECT user_info.user_id, user_family.fuser_id as towho FROM user_info
-          LEFT JOIN user_family ON user_info.user_id = user_family.user_id
-          WHERE user_info.grade = $sGrade
-          AND user_info.organization_id = $sSchool
-          AND user_info.class = $sClass
-          AND user_info.used = '1'
-          AND LENGTH(user_family.user_id) > 4
-          GROUP by user_info.user_id";
-        break;
-    }
-    // echo $sSQLTO;
-    $oTO = $dbh->prepare($sSQLTO);
-    $oTO->execute();
-    $vTOWHO = $oTO->fetchAll(\PDO::FETCH_ASSOC);
-
-    if (!empty($vTOWHO) && is_array($vTOWHO)) {
-      $vTo = array();
-      $vTo[] = '<select id="sel_parent">';
-      $vTo[] =   '<option value="'.base64_encode($sToAll).'">全部</option>';
-      foreach($vTOWHO as $vWHO) {
-        // $sToName = id2uname($vWHO['user_id']);
-        $sToName = id2uname($vWHO['towho']);
-        $vTo[] = '<option value="'.base64_encode($vWHO['towho']).'">'.$sToName.' '. $sTitle.'</option>';
-      }
-      $vTo[] = '</select>';
-    }
-
-    return $vTo;
-  }
-
   function handleData($vMessageData) {
     global $vUserData, $vGroup;
 
@@ -176,7 +196,7 @@
 
     $vNewData = array();
     foreach ($vMessageData as $key => $vMsg) {
-
+      // echo $key.$vMsg['CanSee'].'<br/>';
       // 主訊息，因為資料集是UNION起來，所以要去除重複的編號
       if (!isset($vNewData['msg_'.$vMsg['msg_sn']])) {
 
@@ -197,9 +217,13 @@
           }
         }
 
+        // 因為 $vMsg['CanSee'] 是由 發送者+群組對象+收件者 組合起來，所以發送者不是自己時有可能會透過群組收到訊息，故須排除
         switch($sACL) {
-          case USER_PARENTS: // 家長只能看見自己發的訊息，不能看到其他家長的
-           if ($vMsg['create_user'] != $sUserID && USER_PARENTS == id2UserLevel($vMsg['create_user'])) continue 2;
+          case USER_TEACHER: // 老師只能看見自己發的訊息
+            if ($vMsg['create_user'] != $sUserID) continue 2;
+            break;
+          case USER_PARENTS: // 不能看到其他家長的，但可以收到其他老師發的訊息
+            if ($vMsg['create_user'] != $sUserID && USER_PARENTS == id2UserLevel($vMsg['create_user'])) continue 2;
             break;
         }
 
@@ -573,6 +597,8 @@ function getPassTime($sTime) {
           remsg_delete_flag: '0'
         };
 
+        if ('' === oResponse.response_content || !!oResponse.ERR) return;
+
         var sReg = /(\\)|(\')|(\")/g;
         var vMathErrorChart = oResponse.response_content.match(sReg);
         if (null != vMathErrorChart && 0 < vMathErrorChart.length) {
@@ -581,7 +607,11 @@ function getPassTime($sTime) {
           return;
         }
 
-        if ('' === oResponse.response_content || !!oResponse.ERR) return;
+        var sFindStr = oResponse.response_content.match(/@[\u4e00-\u9fa5_a-zA-Z0-9]+\s/g);
+        if ($.isEmptyObject(oReMsg) && null !== sFindStr) {
+          alert('若要回覆，請點回覆按鈕選擇對象');
+          return;
+        }
 
         if (!!oReMsg && -1 != oResponse.response_content.indexOf('@' + oReMsg.res_resmsgto_user)) {
           oResponse.res_resmsgto_userid = oReMsg.res_resmsgto_userid;
