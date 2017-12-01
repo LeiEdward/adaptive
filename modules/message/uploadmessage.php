@@ -48,7 +48,7 @@
 
         // 取得現在 message_master 流水號
         $oSQLMessageInx = $dbh->prepare("SELECT auto_increment FROM information_schema.tables
-          WHERE table_schema = 'kbnattest'
+          WHERE table_schema = '$db_dbn'
           AND table_name = 'message_master'");
         $oSQLMessageInx->execute();
         $vIndex = $oSQLMessageInx->fetch();

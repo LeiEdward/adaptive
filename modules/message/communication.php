@@ -103,7 +103,6 @@
           WHERE seme_teacher_subject.organization_id IN ('$sOrganizeID')
           AND seme_teacher_subject.grade IN ('$sGrade')
           AND seme_teacher_subject.class IN ('$sClass')
-          AND seme_teacher_subject.teacher_id LIKE '%-t%'
           AND user_info.used = '1'
           GROUP by user_info.user_id";
         break;
@@ -215,16 +214,16 @@
               if ($iMax == $iCount) continue 2;
             }
           }
-        }
 
-        // 因為 $vMsg['CanSee'] 是由 發送者+群組對象+收件者 組合起來，所以發送者不是自己時有可能會透過群組收到訊息，故須排除
-        switch($sACL) {
-          case USER_TEACHER: // 老師只能看見自己發的訊息
-            if ($vMsg['create_user'] != $sUserID) continue 2;
-            break;
-          case USER_PARENTS: // 不能看到其他家長的，但可以收到其他老師發的訊息
-            if ($vMsg['create_user'] != $sUserID && USER_PARENTS == id2UserLevel($vMsg['create_user'])) continue 2;
-            break;
+          // 因為 $vMsg['CanSee'] 是由 發送者+群組對象+收件者 組合起來，所以發送者不是自己時有可能會透過群組收到訊息，故須排除
+          switch($sACL) {
+            case USER_TEACHER: // 老師不能看到其他老師的，但可以收到其他家長發的訊息
+              if ($vMsg['create_user'] != $sUserID && USER_TEACHER == id2UserLevel($vMsg['create_user'])) continue 2;
+              break;
+            case USER_PARENTS: // 不能看到其他家長的，但可以收到其他老師發的訊息
+              if ($vMsg['create_user'] != $sUserID && USER_PARENTS == id2UserLevel($vMsg['create_user'])) continue 2;
+              break;
+          }
         }
 
         $vNewData['msg_'.$vMsg['msg_sn']]['msg_sn'] = $vMsg['msg_sn'];
@@ -341,7 +340,7 @@ function getPassTime($sTime) {
   .qa_title > ul > li > .name {color:rgb(0, 0, 255);}
   .qa_title > ul > li > .time {padding:0px 4px;margin-bottom:5px;font-size:14px;max-width:11em;color:#999;vertical-align:middle;white-space:nowrap;display:inline-block;text-overflow:ellipsis;overflow:hidden;}
   .qa_title > ul > li > span > .resmsg {color:rgb(150, 150, 255);cursor:pointer;}
-  .qa_title > ul > li > .info {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
+  .qa_title > ul > li > .messageinfo {display:inline-block;height:25px;float:right;font-size:14px;margin-right:1em;}
   .qa_title > ul > li > .attachedfile {display:flex;height:25px;font-size:14px;vertical-align:middle;justify-content:flex-end;}
   .qa_title > ul > li > .attachedfile > .ico {display:inline-block;height:25px;width:25px;margin:0px 5px;background-size:80%;background-position:center;background-repeat:no-repeat;background-image: url("./images/toolbar/file.png");}
   .qa_title > ul > li > .attachedfile > .filename {flex:80;display:flex;justify-content:stretch;overflow:hidden;white-space: nowrap;}
@@ -571,6 +570,7 @@ function getPassTime($sTime) {
               }
               else {
                 alert(oRtn.MSG);
+                return;
               }
             },
             error: function (jqXHR, textStatus, errorMessage) {
@@ -644,6 +644,7 @@ function getPassTime($sTime) {
               }
               else {
                 alert(oRtn.MSG);
+                return;
               }
             },
             error: function (jqXHR, textStatus, errorMessage) {
@@ -777,6 +778,7 @@ function getPassTime($sTime) {
               }
               else {
                 alert(oRtn.MSG);
+                return;
               }
             },
             error: function (jqXHR, textStatus, errorMessage) {
@@ -836,6 +838,7 @@ function getPassTime($sTime) {
               }
               else {
                 alert('檔案上傳失敗' + ' ' + oRtn.MSG);
+                return;
               }
             },
             error: function (jqXHR, textStatus, errorMessage) {
@@ -884,6 +887,7 @@ function getPassTime($sTime) {
                 }
                 else {
                   alert(oRtn.MSG);
+                  return;
                 }
               },
               error: function (jqXHR, textStatus, errorMessage) {
@@ -940,6 +944,7 @@ function getPassTime($sTime) {
                   }
                   else {
                     alert(oRtn.MSG);
+                    return;
                   }
                 },
                 error: function (jqXHR, textStatus, errorMessage) {
@@ -1028,7 +1033,7 @@ function insertAtCursor(myField, myValue) {
                         <span class="filename" v-for="oFile in item.msgfile">
                           <span v-if="oFile.file_orgnialname"><a v-bind:href="oFile.filesrc" v-bind:download="oFile.file_orgnialname">{{oFile.file_orgnialname}}</a></span>
                         </span>
-                        <span class="info" v-if="item.response_total">留言數({{item.response_total}})</span>
+                        <span class="messageinfo" v-if="item.response_total">留言數({{item.response_total}})</span>
                       </span>
                     </li>
   								</ul>
