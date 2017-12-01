@@ -40,6 +40,12 @@ if($user_data->access_level>=20 && $_GET['q_user_id']!=$user_data->user_id){
 		echo "接下來要印出診斷報告<br><br>但正在維護中，故本次不列出。請由使用上方的「成果查詢」<br><br>抱歉！！";
 		die();
 	}
+}elseif($user_data->access_level ==11){ // 家長
+	if(!is_null($_REQUEST['organization']))
+		$_SESSION['org']=$_REQUEST['organization'];
+	
+	chooseChild($_SESSION['org'], $_SESSION['child_data']);
+	
 }else{  //學生使用
 
 	$q_user_id=$user_data->user_id;
@@ -86,6 +92,15 @@ if($_GET['report']==1){  //顯示個人測驗結果
 	PrintOutpersonExamResults($_GET['q_user_id'], $_GET['q_cs_id'], $_GET['report']);
 }
 
+function chooseChild($org, $child_data){
+	global $dbh,$module_name,$user_data;
+
+	foreach ($child_data as $key=>$value){
+		//echo $value["user_id"].',';
+		listAllExams_col($value["user_id"]);
+	}
+
+}
 
 
 function chooseCLASS($org){
@@ -341,7 +356,8 @@ function listAllExams_row($user_id){
 
 function listAllExams_col($user_id){  //學生用
 	global $dbh, $module_name, $col_num, $bg;
-
+	
+	$show_flag = false;
 	$q_uname=id2uname($user_id);
 	//(select count(*) from exam_record WHERE user_id='190041-s61605' GROUP by user_id) UNION (SELECT COUNT(*) FROM exam_record_indicate WHERE user_id = '190041-s61605')
 	$sql="(select count(*) from exam_record WHERE user_id='$user_id'  GROUP by user_id)
@@ -352,186 +368,188 @@ function listAllExams_col($user_id){  //學生用
 	if($row['count(*)']==0){
 		echo "<center><br><br><br>目前沒有任何測驗記錄可供查詢！<br><br><br><br></center>";
 		require_once("die_feet.php");
-		die();
+		//die();
+	}else $show_flag = true;
+	
+	if($show_flag) {
+		$bgcolor=array('white','ffeaff');
+		//170808，新增學年度查詢，此sql為撈學年度用。
+		$search_year = $dbh->prepare("SELECT seme_student.seme_year_seme FROM seme_student GROUP BY seme_year_seme ORDER BY seme_year_seme DESC");
+		$search_year->execute();
+		$study_year_data = $search_year->fetchAll(\PDO::FETCH_ASSOC);
+		$study_year = array();
+		//將撈到的學念度的資料存進陣列
+		foreach ($study_year_data as $key=>$value){
+			//因抓出來的資料為1061或1052，要將字串做處理，只抓取前三位的學年度。
+			$study_year[$value["seme_year_seme"]]["seme_year"] = substr($value["seme_year_seme"],0,3);
+		}
+		
+		//170808，增加搜尋條件[學年度]。增加搜尋表[exam_record]、搜尋欄位[seme_year]、條件[record.seme_year=使用者所選學年度]
+		///$select_seme_year用來存放user選擇的學年度的值。
+		$select_seme_year;
+		//$semeYear_to_CEyear;
+		//$semeYear_to_NextCEyear;
+		
+		//170821，選擇診斷報告後，避免refresh到預設頁面，讓頁面停留在使用者所選擇的學年度。
+		//新增判斷條件$_SESSION['seme_year'] == ''，如果session值為空，代表第一次進入，才會預設學年度。
+		if(isset($_POST["seme"])=='' && $_SESSION['seme_year'] == '') {
+			$select_seme_year=getNowSemeYear();
+			//if抓到106，則時間區段為2017/9~2018/8
+			//$semeYear_to_CEyear = $select_seme_year + 1911; //民國106-->西元2017
+			//$semeYear_to_NextCEyear = $semeYear_to_CEyear + 1; //2017 +1 = 2018
+		
+		} elseif($_SESSION['seme_year'] != '') {
+			//170821，重新load頁面時，不會有POST值，而如果session不為空，則將學年度設為session值，為使用者之前所選擇的年度。
+			$select_seme_year = $_SESSION['seme_year'];
+		
+		}else {
+			//因抓出來的資料為1061或1052，要將字串做處理，只抓取前三位的學年度。
+			$select_seme_year = substr($_POST["seme"],0,3);
+		
+			//$semeYear_to_CEyear = $select_seme_year + 1911; //if民國106-->西元2017
+			//$semeYear_to_NextCEyear = $semeYear_to_CEyear + 1; //2017 +1 = 2018
+		}
+		
+		//撈出學生的作答紀錄
+		//$sql="select * from exam_record WHERE user_id='$user_id' group by exam_title";
+		//因為 group by，所以只會抓出一組exam_title的作答資料
+		$sql="
+		select *
+		from exam_record
+		WHERE user_id='$user_id' AND seme_year='$select_seme_year'
+		ORDER BY exam_title, exam_sn
+		";
+		/*$sql="(select exam_title, exam_sn, user_id,cs_id, paper_vol, score from exam_record a WHERE a.user_id='$user_id' ORDER BY a.exam_title, a.exam_sn)
+		 UNION (select cs_id as exam_title, exam_sn, user_id, cs_id, '1' as paper_vol, 'NAN' as score from exam_record_indicate b WHERE b.user_id='$user_id' ORDER BY b.cs_id, b.exam_sn)";*/
+		//debug_msg("第".__LINE__."行 sql ", $sql);
+		$result =$dbh->query($sql);
+		
+		/*$sql2="select DISTINCT result_sn as exam_title, indicate.exam_sn, indicate.user_id, indicate.cs_id, '1' as paper_vol, 'NAN' as score, indicate.date FROM exam_record_indicate indicate WHERE indicate.user_id='".$user_id."' AND indicate.date BETWEEN '".$semeYear_to_CEyear."-08%' AND '".$semeYear_to_NextCEyear."-07%' ORDER BY indicate.cs_id, indicate.exam_sn";*/
+		
+		$sql2="select DISTINCT result_sn as exam_title, indicate.exam_sn, indicate.user_id, indicate.cs_id, '1' as paper_vol, 'NAN' as score, indicate.date FROM exam_record_indicate indicate, mission_info info WHERE indicate.user_id='$user_id' AND info.mission_sn = indicate.result_sn AND info.semester LIKE '".$select_seme_year."%' ORDER BY indicate.cs_id, indicate.exam_sn";
+		
+				$result2 =$dbh->query($sql2);
+		
+				while ($row=$result->fetch()){
+				//$bg_count=($i+1)%$col_num;
+					$i[ $row['exam_title'] ]+=1;
+					$my_csid=explode_cs_id($row['cs_id']);
+					$my_p=id2publisher(intval($my_csid[0])).' ';
+					$my_s=id2subject(intval($my_csid[1]));
+					$my_v="第".intval($my_csid[2])."冊";
+					$my_u="第".intval($my_csid[3])."單元";
+					$my_csname=id2csname($row['cs_id']);
+					$cs_title=$my_p.$my_s.$my_v.$my_u.'【'.$my_csname.'】';
+					$paper_vol=$row['paper_vol'];
+					//$url='<a href="modules.php?op=modload&name='.$module_name.'&file=classReports&report=1&q_user_id='.$user_id.'&q_cs_id='.$row['cs_id'].'&q_pvol='.$row['paper_vol'].'&exam_sn='.$row[exam_sn].'">';
+					$url='modules.php?op=modload&name='.$module_name.'&file=classReports&report=1&q_user_id='.$user_id.'&q_cs_id='.$row['cs_id'].'&q_pvol='.$row['paper_vol'].'&exam_sn='.$row[exam_sn].'&examTime='.$i[ $row['cs_id'] ];
+					if( $_GET[exam_sn]==$row[exam_sn] ) $optionSel = 'selected';
+					else $optionSel = '';
+					if($row[score] >0) $selOption[$row[cs_id]][]='<option value="'.$url.'" '.$optionSel.'> 卷'.$paper_vol.'第'.($i[ $row['exam_title'] ]).'次測驗。答對比率：'.$row[score].'% </option>'; //num2English($paper_vol)
+					else $selOption[$row[cs_id]][]='<option value="'.$url.'" '.$optionSel.'> 卷'.$paper_vol.'第'.($i[ $row['exam_title'] ]).'次測驗。 </option>';//num2English($paper_vol)
+					$cs_titleAry[$row[cs_id]]=$cs_title;
+		
+				}
+		
+				while ($row2=$result2->fetch()){
+					$sql_mission ='SELECT * FROM `mission_info` WHERE mission_sn="'.$row2['exam_title'].'"';
+					$re_mission=$dbh->query($sql_mission);
+					$data_mission=$re_mission->fetch();
+		
+					$i[ $row2['exam_title'] ]+=1;
+					$my_csid=explode_cs_id($row2['cs_id']);
+					if(empty($data_mission['mission_nm'])) $cs_title=id2csname($row2['cs_id']);
+					else $cs_title='任務：【'.$data_mission['mission_nm'].'】';
+					$paper_vol=$row2['paper_vol'];
+		
+					$url='modules.php?op=modload&name='.$module_name.'&file=classReports&report=1&q_user_id='.$user_id.'&q_cs_id='.$row2['cs_id'].'&q_pvol='.$row2['paper_vol'].'&exam_sn='.$row2[exam_sn].'&examTime='.$i[ $row2['cs_id'] ].'&mission_sn='.$row2['exam_title'];
+					if( $_GET[exam_sn]==$row2[exam_sn] ) $optionSel = 'selected';
+					else $optionSel = '';
+					$selOption[$row2[exam_title]][]='<option value="'.$url.'" '.$optionSel.'>第'.($i[ $row2['exam_title'] ]).'次測驗('.$row2['date'].')。 </option>';
+					$cs_titleAry[$row2[exam_title]]=$cs_title;
+				}
+				unset($i);
+				foreach( $cs_titleAry as $key=>$val ){
+					$i++;
+					$tmpHtml[$key]= '
+				      <tr>
+				        <td >'.$i.'
+				        <td >'.$val.'
+				        <td ><select class="sel_vol"> <option value="stop">請選擇</option>'.implode('', $selOption[$key]).' </select>
+				    ';
+		
+				}
+		
+				$reportHtml[]='<div class="content2-Box">';
+				//$reportHtml[]='<div class="path">目前位置：診斷報告</div>';
+				if($_SESSION[userData]->access_level!=21){
+					$reportHtml[]='<div class="path">目前位置：診斷報告</div>';
+					$reportHtml[]='<div class="choice-title">診斷</div>';
+					$reportHtml[]='<ul class="choice work-cholic">';
+					$reportHtml[]='<li><a href="modules.php?op=modload&name=ExamResult&file=classReports" class="current"><i class="fa fa-caret-right"></i>診斷報告</a></li>';
+					$reportHtml[]='<li><a href="modules.php?op=modload&name=ExamResult&file=record_list"><i class="fa fa-caret-right"></i>診斷報告(CPS)</a></li>';
+					$reportHtml[]='</ul>';
+					$reportHtml[]='</div>';
+				}
+				$reportHtml[]='<div class="main-box">';
+				//170808，新增學年度下拉式選單。
+				if($_SESSION[userData]->access_level!=21){
+					$reportHtml[]='<div class="left-box">';
+					$reportHtml[]='<form method="POST" action="modules.php?op=modload&name=ExamResult&file=classReports">';
+					$reportHtml[]='<select id=seme name="seme">';
+					$reportHtml[]='<option value="">請選擇(學期)</option>';
+					foreach ($study_year as $key=>$value){
+		
+						if($_POST["seme"] == $value["seme_year"] && $_POST["btn02"]!=""){
+							$att = "selected=\"selected\"";
+						}else $att = "";
+						$reportHtml[]='<option value="'.$value["seme_year"].'"'.$att.">".$value["seme_year"]."學年度</option>";
+					}
+					$reportHtml[]='</select>';
+					$reportHtml[]='<input  style="width: 150px; display: inline;" id="btn02" name="btn02" type="submit" class="btn02" value="提交">';
+					$reportHtml[]='</form>';
+					$reportHtml[]='</div>';
+					$reportHtml[]='<div class="right-box">';
+				}
+				$reportHtml[]='<div class="title01">'.$user_id.'【'.$q_uname.'】'.$_SESSION['seme_year'].'學年度測驗單元</div>';
+				if($_SESSION[userData]->access_level==21){
+					$reportHtml[]='<form method="POST" action="modules.php?op=modload&name=ExamResult&file=classReports">';
+					$reportHtml[]='<select id=seme name="seme" style="width: 150px;>';
+					$reportHtml[]='<option value="">請選擇(學期)</option>';
+					foreach ($study_year as $key=>$value){
+		
+						if($_POST["seme"] == $value["seme_year"] && $_POST["btn02"]!=""){
+							$att = "selected=\"selected\"";
+						}else $att = "";
+						$reportHtml[]='<option value="'.$value["seme_year"].'"'.$att.">".$value["seme_year"]."學年度</option>";
+					}
+					$reportHtml[]='</select>';
+					$reportHtml[]='<input  style="width: 150px;display: inline;margin-left: 20px;" display: inline;" id="btn02" name="btn02" type="submit" class="btn02" value="提交">';
+					$reportHtml[]='</form>';
+				}
+		
+		
+				$reportHtml[]='<div class="table_scroll">';
+				$reportHtml[]='<table class="datatable datatable-l">';
+				$reportHtml[]='<tr> <th>編號 <th>單元診斷 與 縱貫任務名稱 <th>診斷報告';
+				$reportHtml[]=implode('',$tmpHtml);
+				$reportHtml[]='</table>';
+				if($_SESSION[userData]->access_level!=21){
+					$reportHtml[]='</div></div></div></div>';
+				}else{
+					$reportHtml[]='</div></div></div>';
+				}
+				$reportHtml[]='
+			    <script>
+			      $(".sel_vol").on("change",function(){
+			        if( $(this).val()==="stop" ) return true;
+			       	document.location.href = $(this).val();
+			    } );
+					
+			    </script>
+			  ';
+				echo implode( '', $reportHtml );
 	}
-
-	$bgcolor=array('white','ffeaff');
-	//170808，新增學年度查詢，此sql為撈學年度用。
-	$search_year = $dbh->prepare("SELECT seme_student.seme_year_seme FROM seme_student GROUP BY seme_year_seme ORDER BY seme_year_seme DESC");
-	$search_year->execute();
-	$study_year_data = $search_year->fetchAll(\PDO::FETCH_ASSOC);
-	$study_year = array();
-	//將撈到的學念度的資料存進陣列
-	foreach ($study_year_data as $key=>$value){
-		//因抓出來的資料為1061或1052，要將字串做處理，只抓取前三位的學年度。
-		$study_year[$value["seme_year_seme"]]["seme_year"] = substr($value["seme_year_seme"],0,3);
-	}
-
-	//170808，增加搜尋條件[學年度]。增加搜尋表[exam_record]、搜尋欄位[seme_year]、條件[record.seme_year=使用者所選學年度]
-	///$select_seme_year用來存放user選擇的學年度的值。
-	$select_seme_year;
-	//$semeYear_to_CEyear;
-	//$semeYear_to_NextCEyear;
-
-	//170821，選擇診斷報告後，避免refresh到預設頁面，讓頁面停留在使用者所選擇的學年度。
-	//新增判斷條件$_SESSION['seme_year'] == ''，如果session值為空，代表第一次進入，才會預設學年度。
-	if(isset($_POST["seme"])=='' && $_SESSION['seme_year'] == '') {
-		$select_seme_year=getNowSemeYear();
-		//if抓到106，則時間區段為2017/9~2018/8
-		//$semeYear_to_CEyear = $select_seme_year + 1911; //民國106-->西元2017
-		//$semeYear_to_NextCEyear = $semeYear_to_CEyear + 1; //2017 +1 = 2018
-
-	} elseif($_SESSION['seme_year'] != '') {
-		//170821，重新load頁面時，不會有POST值，而如果session不為空，則將學年度設為session值，為使用者之前所選擇的年度。
-		$select_seme_year = $_SESSION['seme_year'];
-
-	}else {
-		//因抓出來的資料為1061或1052，要將字串做處理，只抓取前三位的學年度。
-		$select_seme_year = substr($_POST["seme"],0,3);
-
-		//$semeYear_to_CEyear = $select_seme_year + 1911; //if民國106-->西元2017
-		//$semeYear_to_NextCEyear = $semeYear_to_CEyear + 1; //2017 +1 = 2018
-	}
-
-	//撈出學生的作答紀錄
-	//$sql="select * from exam_record WHERE user_id='$user_id' group by exam_title";
-	//因為 group by，所以只會抓出一組exam_title的作答資料
-	$sql="
-	select *
-	from exam_record
-	WHERE user_id='$user_id' AND seme_year='$select_seme_year'
-	ORDER BY exam_title, exam_sn
-	";
-	/*$sql="(select exam_title, exam_sn, user_id,cs_id, paper_vol, score from exam_record a WHERE a.user_id='$user_id' ORDER BY a.exam_title, a.exam_sn)
-	 UNION (select cs_id as exam_title, exam_sn, user_id, cs_id, '1' as paper_vol, 'NAN' as score from exam_record_indicate b WHERE b.user_id='$user_id' ORDER BY b.cs_id, b.exam_sn)";*/
-	//debug_msg("第".__LINE__."行 sql ", $sql);
-	$result =$dbh->query($sql);
-
-	/*$sql2="select DISTINCT result_sn as exam_title, indicate.exam_sn, indicate.user_id, indicate.cs_id, '1' as paper_vol, 'NAN' as score, indicate.date FROM exam_record_indicate indicate WHERE indicate.user_id='".$user_id."' AND indicate.date BETWEEN '".$semeYear_to_CEyear."-08%' AND '".$semeYear_to_NextCEyear."-07%' ORDER BY indicate.cs_id, indicate.exam_sn";*/
-
-	$sql2="select DISTINCT result_sn as exam_title, indicate.exam_sn, indicate.user_id, indicate.cs_id, '1' as paper_vol, 'NAN' as score, indicate.date FROM exam_record_indicate indicate, mission_info info WHERE indicate.user_id='$user_id' AND info.mission_sn = indicate.result_sn AND info.semester LIKE '".$select_seme_year."%' ORDER BY indicate.cs_id, indicate.exam_sn";
-
-	$result2 =$dbh->query($sql2);
-
-	while ($row=$result->fetch()){
-		//$bg_count=($i+1)%$col_num;
-		$i[ $row['exam_title'] ]+=1;
-		$my_csid=explode_cs_id($row['cs_id']);
-		$my_p=id2publisher(intval($my_csid[0])).' ';
-		$my_s=id2subject(intval($my_csid[1]));
-		$my_v="第".intval($my_csid[2])."冊";
-		$my_u="第".intval($my_csid[3])."單元";
-		$my_csname=id2csname($row['cs_id']);
-		$cs_title=$my_p.$my_s.$my_v.$my_u.'【'.$my_csname.'】';
-		$paper_vol=$row['paper_vol'];
-		//$url='<a href="modules.php?op=modload&name='.$module_name.'&file=classReports&report=1&q_user_id='.$user_id.'&q_cs_id='.$row['cs_id'].'&q_pvol='.$row['paper_vol'].'&exam_sn='.$row[exam_sn].'">';
-		$url='modules.php?op=modload&name='.$module_name.'&file=classReports&report=1&q_user_id='.$user_id.'&q_cs_id='.$row['cs_id'].'&q_pvol='.$row['paper_vol'].'&exam_sn='.$row[exam_sn].'&examTime='.$i[ $row['cs_id'] ];
-		if( $_GET[exam_sn]==$row[exam_sn] ) $optionSel = 'selected';
-		else $optionSel = '';
-		if($row[score] >0) $selOption[$row[cs_id]][]='<option value="'.$url.'" '.$optionSel.'> 卷'.$paper_vol.'第'.($i[ $row['exam_title'] ]).'次測驗。答對比率：'.$row[score].'% </option>'; //num2English($paper_vol)
-		else $selOption[$row[cs_id]][]='<option value="'.$url.'" '.$optionSel.'> 卷'.$paper_vol.'第'.($i[ $row['exam_title'] ]).'次測驗。 </option>';//num2English($paper_vol)
-		$cs_titleAry[$row[cs_id]]=$cs_title;
-
-	}
-
-	while ($row2=$result2->fetch()){
-		$sql_mission ='SELECT * FROM `mission_info` WHERE mission_sn="'.$row2['exam_title'].'"';
-		$re_mission=$dbh->query($sql_mission);
-		$data_mission=$re_mission->fetch();
-
-		$i[ $row2['exam_title'] ]+=1;
-		$my_csid=explode_cs_id($row2['cs_id']);
-		if(empty($data_mission['mission_nm'])) $cs_title=id2csname($row2['cs_id']);
-		else $cs_title='任務：【'.$data_mission['mission_nm'].'】';
-		$paper_vol=$row2['paper_vol'];
-
-		$url='modules.php?op=modload&name='.$module_name.'&file=classReports&report=1&q_user_id='.$user_id.'&q_cs_id='.$row2['cs_id'].'&q_pvol='.$row2['paper_vol'].'&exam_sn='.$row2[exam_sn].'&examTime='.$i[ $row2['cs_id'] ].'&mission_sn='.$row2['exam_title'];
-		if( $_GET[exam_sn]==$row2[exam_sn] ) $optionSel = 'selected';
-		else $optionSel = '';
-		$selOption[$row2[exam_title]][]='<option value="'.$url.'" '.$optionSel.'>第'.($i[ $row2['exam_title'] ]).'次測驗('.$row2['date'].')。 </option>';
-		$cs_titleAry[$row2[exam_title]]=$cs_title;
-	}
-	unset($i);
-	foreach( $cs_titleAry as $key=>$val ){
-		$i++;
-		$tmpHtml[$key]= '
-      <tr>
-        <td >'.$i.'
-        <td >'.$val.'
-        <td ><select class="sel_vol"> <option value="stop">請選擇</option>'.implode('', $selOption[$key]).' </select>
-    ';
-
-	}
-
-	$reportHtml[]='<div class="content2-Box">';
-	//$reportHtml[]='<div class="path">目前位置：診斷報告</div>';
-	if($_SESSION[userData]->access_level!=21){
-	$reportHtml[]='<div class="path">目前位置：診斷報告</div>';
-	$reportHtml[]='<div class="choice-title">診斷</div>';
-	$reportHtml[]='<ul class="choice work-cholic">';
-	$reportHtml[]='<li><a href="modules.php?op=modload&name=ExamResult&file=classReports" class="current"><i class="fa fa-caret-right"></i>診斷報告</a></li>';
-	$reportHtml[]='<li><a href="modules.php?op=modload&name=ExamResult&file=record_list"><i class="fa fa-caret-right"></i>診斷報告(CPS)</a></li>';
-	$reportHtml[]='</ul>';
-	$reportHtml[]='</div>';
-	}
-	$reportHtml[]='<div class="main-box">';
-	//170808，新增學年度下拉式選單。
-	if($_SESSION[userData]->access_level!=21){
-	$reportHtml[]='<div class="left-box">';
-	$reportHtml[]='<form method="POST" action="modules.php?op=modload&name=ExamResult&file=classReports">';
-	$reportHtml[]='<select id=seme name="seme">';
-	$reportHtml[]='<option value="">請選擇(學期)</option>';
-	foreach ($study_year as $key=>$value){
-
-		if($_POST["seme"] == $value["seme_year"] && $_POST["btn02"]!=""){
-			$att = "selected=\"selected\"";
-		}else $att = "";
-		$reportHtml[]='<option value="'.$value["seme_year"].'"'.$att.">".$value["seme_year"]."學年度</option>";
-	}
-	$reportHtml[]='</select>';
-	$reportHtml[]='<input  style="width: 150px; display: inline;" id="btn02" name="btn02" type="submit" class="btn02" value="提交">';
-	$reportHtml[]='</form>';
-	$reportHtml[]='</div>';
-	$reportHtml[]='<div class="right-box">';
-	}
-	$reportHtml[]='<div class="title01">'.$user_id.'【'.$q_uname.'】'.$_SESSION['seme_year'].'學年度測驗單元</div>';
-	if($_SESSION[userData]->access_level==21){
-	$reportHtml[]='<form method="POST" action="modules.php?op=modload&name=ExamResult&file=classReports">';
-	$reportHtml[]='<select id=seme name="seme" style="width: 150px;>';
-	$reportHtml[]='<option value="">請選擇(學期)</option>';
-	foreach ($study_year as $key=>$value){
-
-		if($_POST["seme"] == $value["seme_year"] && $_POST["btn02"]!=""){
-			$att = "selected=\"selected\"";
-		}else $att = "";
-		$reportHtml[]='<option value="'.$value["seme_year"].'"'.$att.">".$value["seme_year"]."學年度</option>";
-	}
-	$reportHtml[]='</select>';
-	$reportHtml[]='<input  style="width: 150px;display: inline;margin-left: 20px;" display: inline;" id="btn02" name="btn02" type="submit" class="btn02" value="提交">';
-	$reportHtml[]='</form>';
-	}
-
-
-	$reportHtml[]='<div class="table_scroll">';
-	$reportHtml[]='<table class="datatable datatable-l">';
-	$reportHtml[]='<tr> <th>編號 <th>單元診斷 與 縱貫任務名稱 <th>診斷報告';
-	$reportHtml[]=implode('',$tmpHtml);
-	$reportHtml[]='</table>';
-	if($_SESSION[userData]->access_level!=21){
-	$reportHtml[]='</div></div></div></div>';
-	}else{
-	$reportHtml[]='</div></div></div>';
-	}
-	$reportHtml[]='
-    <script>
-      $(".sel_vol").on("change",function(){
-        if( $(this).val()==="stop" ) return true;
-       	document.location.href = $(this).val();
-    } );
-
-    </script>
-  ';
-	echo implode( '', $reportHtml );
 // debugBAI('', 'listAllExams_col', $reportHtml);
 }
 
