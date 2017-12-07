@@ -313,6 +313,7 @@ function getPassTime($sTime) {
 <html>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
 <style>
+  body {font-family:"Microsoft JhengHei", "Arial", sans-serif !important};
   ul, li {margin:0px;padding:0px;list-style:none;}
   textarea {resize:none;}
   ins {text-decoration: none !important;}
