@@ -7,6 +7,9 @@
   }
   $sUpload = $_POST['upload'];
 
+  // 取得 user 資料
+  $vUserData = get_object_vars($_SESSION['user_data']);
+
   $vRtn = array();
   $vRtn['STATUS'] = 'SUCCESS';
   switch($sUpload) {
@@ -54,7 +57,7 @@
         $vIndex = $oSQLMessageInx->fetch();
         $sIndex = $vIndex['auto_increment'] - 1;
 
-        $sFilePath = '../../data/message/'.$_SESSION['user_id'];
+        $sFilePath = '../../data/message/'.$vUserData['user_id'];
 
         if (isset($_SESSION['message']['uploadfile'])) {
           if (!is_dir($sFilePath)) {

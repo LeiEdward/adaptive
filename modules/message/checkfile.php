@@ -7,7 +7,11 @@
   }
 
   $vRtn = array();
-  $sUserID = $_SESSION['user_id'];
+
+  // 取得 user 資料
+  $vUserData = get_object_vars($_SESSION['user_data']);
+  $sUserID = $vUserData['user_id'];
+
   $vRtn['STATUS'] = 'SUCCESS';
 
   switch($_FILES['import_file']['type']) {
