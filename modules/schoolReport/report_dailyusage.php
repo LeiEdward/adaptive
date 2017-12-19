@@ -226,6 +226,14 @@
 
     return implode('', $vCitySelect);
   }
+/* adp_core_function.php 已有宣告
+  function arraytoJS($vData) {
+    $sJSOject = array();
+    if(!empty($vData) && is_array($vData)) {
+       $sJSOject = json_encode($vData);
+    }
+    return $sJSOject;
+  }*/
 
   function getReprotData($vData) {
     global $dbh, $vUserData;
