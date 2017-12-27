@@ -202,7 +202,7 @@ function getSelector() {
           <dd v-for="oReport in Report">
             <sapn v-for="item in oReport.priori_remedy_rate">
               <sapn>{{item}}<sapn>
-              <i>(圖)</i>
+              <i></i>
               <sapn><input type="checkbox"></sapn>
             </sapn>
           </dd>
