@@ -69,7 +69,7 @@ function getRecodeData() {
 
   $sClassSQL = "SELECT * FROM seme_teacher_subject WHERE teacher_id LIKE '%$sUserID%'
   AND subject_id IN ('$sSub')";
-  // echo $sClassSQL;
+
   $oClass = $dbh->prepare($sClassSQL);
   $oClass->execute();
   $vClassData = $oClass->fetchAll(\PDO::FETCH_ASSOC);
@@ -84,6 +84,7 @@ function getRecodeData() {
   $vPrioriData['Condition']['subject'] = array_unique($vCondSelect['subject']);
   $vPrioriData['Condition']['class'] = array_unique($vCondSelect['class']);
 
+  // echo $sClassSQL;
   // echo '<pre>';
   // print_r($vPrioriData);
   return $vPrioriData;
@@ -96,9 +97,9 @@ function handleData() {
   foreach ($vReportData as $vData) {
     if ('' == $vData['cp_id'] || '' == $vData['concept']) continue;
 
-    $vUser = explode('-', $vData['user_id']);$vUser = explode('-', $vData['user_id']);
-    $vPrioriRemedyRate = explode('@XX@', $vData['priori_remedy_rate']);
-    $vIndicatorItem = explode('@XX@', $vData['indicator_item']);
+    $vUser = explode('-', $vData['user_id']);
+    $vPrioriRemedyRate = explode(_SPLIT_SYMBOL, $vData['priori_remedy_rate']);
+    $vIndicatorItem = explode(_SPLIT_SYMBOL, $vData['indicator_item']);
 
     $vNewData[] = array(
       'cp_id' => $vData['cp_id'],
@@ -155,11 +156,45 @@ function getSelector() {
 <!DOCTYPE html>
 <html>
 <style>
-  .left_header {width:150px;}
-  .left_header > thead > tr > * {border-radius:0px !important;}
-  .left_header > tbody > tr > * {height:4em;border-radius:0px !important;}
+.tippic {display:inline-table;font-size:15px;white-space:nowrap;}
+.tippic > dd {display:table-row;}
+.tippic > dd > * {display:table-cell;}
+.tippic > dd > i {font-style:normal;}
+
+/* 外層 */
+.tbl_content {display:flex;}
+
+/* 節點TABLE */
+.scroll_detail {flex:1;display:inline-block;overflow:auto;white-space:nowrap;}
+/* .scroll_detail > .tbl_detail > tbody > tr > td */
+.scroll_detail > .tbl_detail .rem_point {display:inline-block;width:50%;border-right: 1px solid #000;}
+.scroll_detail > .tbl_detail .adp_point {display:inline-block;width:50%;}
+.scroll_detail > .tbl_detail .assign_mission {display:block;border-top: 1px solid #000;}
+.scroll_detail > .tbl_detail .assign_mission > input {transform:scale(1.5);}
+/* scrollbar */
+.scroll_detail::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
+.scroll_detail::-webkit-scrollbar {height:10px; width: 10px;background-color: #F5F5F5;}
+.scroll_detail::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
+
+/* 共用 */
+.scroll_detail > .tbl_detail , .tbl_head , .tbl_foot {border:2px solid rgb(160,160,143);border-collapse:collapse;border-spacing:0px;}
+.scroll_detail > .tbl_detail, .scroll_detail > .tbl_detail > thead > tr > th:first-child, .scroll_detail > .tbl_detail > tbody > tr > td:first-child {border-left:none;}
+.scroll_detail > .tbl_detail > thead > tr > th:last-child, .scroll_detail > .tbl_detail > tbody > tr > td:last-child  {border-right:none;}
+.scroll_detail > .tbl_detail > thead > tr > th, .tbl_head > thead > tr > th, .tbl_foot > thead > tr > th {padding:10px 20px 10px 20px;text-align:center;background-color:rgb(196, 227, 191);border:2px solid rgb(160,160,143);}
+.scroll_detail > .tbl_detail > tbody > tr > td, .tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td {text-align:center;border:2px solid rgb(160,160,143);}
+
+/* .tbl_head 學生姓名 TABLE */
+.tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td  {height:64px;width:90px;}
+
+/* .tbl_foot 任務 TABLE */
+.tbl_foot {margin-left:-6px;z-index:0}
+.tbl_foot > tbody > tr > td {background-color:#FFF;}
+
+.rem_naver {width:30px;background-image:url('./images/start/p5-4-01.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
+.rem_help {width:30px;background-image:url('./images/start/p5-4-02.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
+.rem_pass {width:30px;background-image:url('./images/start/p5-4-03.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
 </style>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.1/vue.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.13/vue.min.js"></script>
 <script>
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
 
@@ -170,7 +205,16 @@ function getSelector() {
       // Vue
       var vueRemedial = new Vue({
         el: '#div_remedial',
-        data: oItem
+        data: oItem,
+        methods: {
+          matchClass: function(sBridge, oArg) {
+            switch (sBridge) {
+              case 'rem_point':
+                return ('△' == oArg.data) ? 'sans-serif' : '';
+                break;
+            }
+          }
+        }
       });
     });
   });
@@ -185,37 +229,87 @@ function getSelector() {
       </form>
     </div>
 		<div id="div_remedial" class="right-box">
-      <div id="div_title" class="title01"></div>
-      <!-- <span>測驗班級：</span> -->
-      <dl style="width:150px;display:inline-block;">
-        <dt>範圍</dt>
-        <dd v-for="item in Report">
-          <sapn>{{item.user_id}}</sapn>
-          <sapn>{{item.user_name}}</sapn>
-        </dd>
-        <dd></dd>
-      </dl>
 
-      <div class="detail" style="width:500px;display:inline-block;overflow:auto;white-space:nowrap;">
-        <dl style="display:inline-block;">
-          <dt v-for="item in indicator_item" style="display:inline-block;">{{item}}</dt>
-          <dd v-for="oReport in Report">
-            <sapn v-for="item in oReport.priori_remedy_rate">
-              <sapn>{{item}}<sapn>
-              <i></i>
-              <sapn><input type="checkbox"></sapn>
-            </sapn>
+      <div id="div_title" class="title01" style="float:left;display:inline-block;width:650px;"></div>
+      <div>
+        <dl class="tippic">
+          <dd>
+            <i>Ｏ</i><span>表示評量指標所有試題均通過</span>
+          </dd>
+          <dd>
+            <i>Ｘ</i>
+            <span>表示評量指標部分試題未通過</span>
+          </dd>
+          <dd><i style="font-family:sans-serif;">△</i>
+            <span>表示評量指標所有試題均未通過</span>
+          </dd>
+        </dl>
+        <dl class="tippic">
+          <dd>
+            <i class="rem_naver"></i>
+            <span>未測驗</span>
+          </dd>
+          <dd>
+            <i class="rem_help"></i>
+            <span>待補救</span>
+          </dd>
+          <dd>
+            <i class="rem_pass"></i>
+            <span>精熟</span>
           </dd>
         </dl>
       </div>
+      <span>測驗班級：</span>
 
-      <dl style="width:150px;display:inline-block;">
-        <dt>任務內容</dt>
-        <dd v-for="item in Report">
-          <i class="fa fa-edit"></i>
-        </dd>
-        <dd></dd>
-      </dl>
+      <div class="tbl_content">
+        <table class="tbl_head">
+          <thead>
+            <tr>
+              <th colspan="2">範圍</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in Report">
+              <td>{{item.user_id}}</td>
+              <td>{{item.user_name}}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="scroll_detail">
+          <table class="tbl_detail">
+            <thead>
+              <tr>
+                <th v-for="item in indicator_item">{{item}}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="oReport in Report">
+                <td v-for="item in oReport.priori_remedy_rate" style="width:100px;">
+                  <span class="rem_point" style="font-family:sans-serif">{{item}}</span>
+                  <span class="adp_point"></span>
+                  <label class="assign_mission"><input type="checkbox"></label>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <table class="tbl_foot">
+          <thead>
+            <tr>
+              <th>任務內容</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in Report">
+              <td>
+                <i class="fa fa-edit"></i>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </body>

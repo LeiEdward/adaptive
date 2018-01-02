@@ -49,6 +49,7 @@ if ($_GET['act']=='logout' && $auth->checkAuth()) {
 
 $mem_usage=null;
 
+//$search_count2 = $dbh->prepare("SELECT count(*) num FROM `message_master` a  WHERE a.touser_id =:user_id and read_mk =:read_mk");
 $search_count2 = $dbh->prepare("SELECT count(*) num FROM `message_master` a  WHERE a.touser_id =:user_id and read_mk =:read_mk and delete_flag = '0'");
 $search_count2->bindValue(':user_id', $user_id, PDO::PARAM_STR);
 $search_count2->bindValue(':read_mk', '0', PDO::PARAM_INT);
@@ -89,6 +90,12 @@ if($op=='modload'){
 		}
 	}
 }elseif($op=='main'){
+	
+	if($user_data->access_level == 11){
+		header("Location: modules.php?op=modload&name=schoolReport&file=family_info");
+		exit();
+	}
+	
 	$_SESSION['user_id']=$user_data->user_id;
 	//$_SESSION['password']=$user_data->viewpass;
 	//學生年級
@@ -106,7 +113,7 @@ if($op=='modload'){
 	$autott_encode=base64_encode($rand_seed.$autott_user.$split_str.$autott_pass.$transfer);
 	$autott_url="http://210.240.189.1/mathITS/index.php?aa='.$autott_encode.'";
 	$CR_url = "modules.php?op=modload&name=assignCR&file=assignCR_list&subject=2";
-?>
+?>	
 <script src="scripts/sweetalert2/sweetalert2.min.js"></script>
 <link rel="stylesheet" href="scripts/sweetalert2/sweetalert2.min.css">
 <?php
@@ -142,14 +149,14 @@ if($op=='modload'){
 		showConfirmButton: false
 	});
 	</script>
-<?php
+<?php 	
 	}
 	echo '<div class="content2-Box">
     	<div class="path">目前位置：<a href="modules.php?op=main">首頁</a></div>
 		<div style="text-align:center; font-size:24px; color:#1c1c1c; padding-bottom:30px; line-height:150%;">';
 	echo '<b>歡迎光臨！您是 '.$user_data->uname.'，身分：'.$user_data->user_level.'。</b>';
 	echo '</div>';
-	$map_new_url = "'modules/D3/app/index_view.php?aa=".base64_encode($_SESSION['user_id'])."'";
+	$map_new_url = "'modules/D3/app/index_view.php?aa=".base64_encode($_SESSION['user_id'])."'"; 
 	if($user_data->access_level < 10 || $user_data->access_level==21){  //暫定等級30以下使用此畫面
 		echo '
 		<script  src="https://code.jquery.com/ui/1.12.1/jquery-ui.js" integrity="sha256-T0Vest3yCU7pafRw9r+settMBX6JkKN06dqBnpQ8d30=" crossorigin="anonymous"></script>
@@ -159,7 +166,7 @@ if($op=='modload'){
        		<li><a href="modules.php?op=modload&name=BayesianTest&file=index"><div class="idx-menu-data">智慧適性診斷<br><div class="btn01">進入查看</div></div></a></li>
        		<li><a href="'.$CR_url.'"><div class="idx-menu-data">互動式學習<br><div class="btn01">進入查看</div></div></a></li>
        		<li><a href="http://210.240.189.1/CPS/login.php?aa='.$cps_encode.'&stuid='.$_SESSION['user_id'].'" target="_blank" ><div class="idx-menu-data">PISA合作問題解決能力<br><div class="btn01">進入查看</div></div></a></li>
-					<li><a href="http://210.240.189.1/GC_assessment/login.php?aa='.$cps_encode.'&stuid='.$_SESSION['user_id'].'" target="_blank" ><div class="idx-menu-data">全球競合力<br><div class="btn01">進入查看</div></div></a></li>
+			<li><a href="http://210.240.189.1/GC_assessment/login.php?aa='.$cps_encode.'&stuid='.$_SESSION['user_id'].'" target="_blank" ><div class="idx-menu-data">全球競合力<br><div class="btn01">進入查看</div></div></a></li>
        </ul>
     </div>';
     	echo '<div id="dialog-message" title="科目選單" style="display:none;">
@@ -174,6 +181,14 @@ if($op=='modload'){
 				<div>
 					<span style="margin-right: 90px;">自然</span>
 					<button id="science" class="ui-button ui-corner-all ui-widget" style=" width: 85px; height: 35px; font-size:15pt; padding-top: 4px">前往</button>
+				</div>
+				<div>
+					<span style="margin-right: 68px;">微積分</span>
+					<button id="calculus" class="ui-button ui-corner-all ui-widget" style=" width: 85px; height: 35px; font-size:15pt; padding-top: 4px">前往</button>
+				</div>
+				<div>
+					<span style="margin-right: 90px;">其他</span>
+					<button id="hkmath" class="ui-button ui-corner-all ui-widget" style=" width: 85px; height: 35px; font-size:15pt; padding-top: 4px">前往</button>
 				</div>
 			</div>';
 
@@ -200,6 +215,12 @@ if($op=='modload'){
     $("#chinese").click(function(){
         location.href= "modules.php?op=modload&name=D3&file=chart&subject="+10;
     })
+    $("#calculus").click(function(){
+        location.href= "modules.php?op=modload&name=D3&file=chart&subject="+11;
+    })
+    $("#hkmath").click(function(){
+        location.href= "modules.php?op=modload&name=D3&file=chart&subject="+12;
+    })
 </script>
 <style>
  #endExam{
@@ -213,17 +234,17 @@ if($op=='modload'){
  }
 </style>
 
-<?php
+<?php 
 }else{
 	//debug_msg("第".__LINE__."行 _REQUEST ", $_REQUEST);
 	die ("抱歉！您的權限不符");
 }
-$mem_usage=echo_memory_usage();
+$mem_usage=echo_memory_usage(); 
 //debug_msg("第".__LINE__."行 _REQUEST ", $_REQUEST);
 if( $_GET['file']=='viewErrorsBN' OR $_REQUEST['screen']=='all'){
 	;
 }elseif($_REQUEST['screen'] == 'frame'){
-	;
+	;            
 }else{
 	//修改by 彥鈞 106.11.22
 	//.$_SERVER["REQUEST_URI"].')-('
@@ -234,10 +255,11 @@ if( $_GET['file']=='viewErrorsBN' OR $_REQUEST['screen']=='all'){
 }
 
 //隨機取得字串
-function create_password($pw_length ='6'){
-	$randpwd = '';
-	for ($i = 0; $i < $pw_length; $i++)	{
-		$randpwd .= chr(mt_rand(33, 126));
-	}
-	return $randpwd;
-}
+function create_password($pw_length ='6'){  
+	$randpwd = '';  
+	for ($i = 0; $i < $pw_length; $i++)	{  
+		$randpwd .= chr(mt_rand(33, 126));  
+	}  
+	return $randpwd;  
+}  
+
