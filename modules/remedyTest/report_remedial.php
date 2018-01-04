@@ -46,7 +46,7 @@
   $sCondSelect = getSelector();
 
   // 查詢條件顯示
-  $sUserSearch = getCondetionRange($vCond);
+  $sUserSearch = getCondetionRange();
 
   // 整理資料, 統一變數傳至HTML
   $sJSOject = arraytoJS(array('setcondition' => $sSetcondition,
@@ -57,6 +57,10 @@
 function getRecodeData() {
   global $dbh, $vUserData, $vCond;
 
+  //
+  $sOrganization = $vUserData['organization_id'];
+
+  //
   $sVersion = $vCond['select_version'];
   $sExamDate = $vCond['select_date'];
   $sClass = $vCond['select_class'];
@@ -74,11 +78,11 @@ function getRecodeData() {
   $sPrioriSQL = "SELECT * FROM exam_record_priori
   LEFT JOIN concept_priori ON exam_record_priori.cp_id = concept_priori.cp_id
   LEFT JOIN map_node_student_status ON exam_record_priori.user_id = map_node_student_status.user_id
-  LEFT JOIN user_info ON user_info.user_id = exam_record_priori.user_id";
+  LEFT JOIN user_info ON user_info.user_id = exam_record_priori.user_id
+  WHERE user_info.organization_id = '$sOrganization'";
   if (!empty($vCond)) {
     // !!
-    // $sPrioriSQL.= " WHERE ";
-    $sPrioriSQL.= " WHERE map_node_student_status.map_sn IN('".subject2mapSN(2)."') ";
+    $sPrioriSQL.= " AND map_node_student_status.map_sn IN('".subject2mapSN(2)."') ";
   }
 
   if (!empty($sSubjectSn)) {
@@ -97,7 +101,7 @@ function getRecodeData() {
   if (!empty($vCond)) {
     $sPrioriSQL.= " ORDER BY exam_record_priori.user_id ";
   }
-
+  // echo $sPrioriSQL;
   $oPriori = $dbh->prepare($sPrioriSQL);
   $oPriori->execute();
   $vPrioriData = $oPriori->fetchAll(\PDO::FETCH_ASSOC);
@@ -185,7 +189,7 @@ function handleData() {
 }
 
 function getSelector() {
-  global $vReportData;
+  global $vReportData, $vCond;
 
   $bDataEmpty = false;
   if (empty($vReportData)) $bDataEmpty = true;
@@ -195,7 +199,11 @@ function getSelector() {
   $vSelect[] =   '<option value="">日期</option>';
   if (!$bDataEmpty) {
     foreach ($vReportData['Condition']['date'] as $sDate) {
-      $vSelect[] = '<option value="'.$sDate.'">'.$sDate.'</option>';
+      $sSelected = '';
+      if ($vCond['select_date'] == $sDate) {
+        $sSelected = 'selected';
+      }
+      $vSelect[] = '<option value="'.$sDate.'" '.$sSelected.'>'.$sDate.'</option>';
     }
   }
   $vSelect[] = '</select>';
@@ -203,7 +211,11 @@ function getSelector() {
   $vSelect[] =   '<option value="">科別</option>';
   if (!$bDataEmpty) {
     foreach ($vReportData['Condition']['subject'] as $sSubject) {
-      $vSelect[] = '<option value="'.$sSubject.'">'.id2subject($sSubject).'</option>';
+      $sSelected = '';
+      if ($vCond['select_subject'] == $sSubject) {
+        $sSelected = 'selected';
+      }
+      $vSelect[] = '<option value="'.$sSubject.'" '.$sSelected.'>'.id2subject($sSubject).'</option>';
     }
   }
   $vSelect[] = '</select>';
@@ -211,7 +223,11 @@ function getSelector() {
   $vSelect[] =   '<option value="">班級</option>';
   if (!$bDataEmpty) {
     foreach ($vReportData['Condition']['class'] as $sClass) {
-      $vSelect[] = '<option value="'.$sClass.'">'.  $sClass.'</option>';
+      $sSelected = '';
+      if ($vCond['select_class'] == $sClass) {
+        $sSelected = 'selected';
+      }
+      $vSelect[] = '<option value="'.$sClass.'" '.$sSelected.'>'.  $sClass.'</option>';
     }
   }
   $vSelect[] = '</select>';
@@ -219,7 +235,11 @@ function getSelector() {
   $vSelect[] =   '<option value="">第幾次匯入</option>';
   if (!$bDataEmpty) {
     foreach ($vReportData['Condition']['version'] as $sVersion) {
-      $vSelect[] = '<option value="'.$sVersion.'">'.  $sVersion.'</option>';
+      $sSelected = '';
+      if ($vCond['select_version'] == $sVersion) {
+        $sSelected = 'selected';
+      }
+      $vSelect[] = '<option value="'.$sVersion.'" '.$sSelected.'>第'.  $sVersion.'次匯入</option>';
     }
   }
   $vSelect[] = '</select>';
@@ -227,7 +247,8 @@ function getSelector() {
   return implode('', $vSelect);
 }
 
-function getCondetionRange($vCond) {
+function getCondetionRange() {
+  global $vCond;
 
   if (!empty($vCond['select_date'])) {
     $sUserSearch = $vCond['select_date'].' / ';
