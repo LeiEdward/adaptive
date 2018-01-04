@@ -1,4 +1,7 @@
 <?php
+  /*
+    TODO 2018-01-04: Edward 暫時只顯示數學科目，其他科目只需微調有!!註記部分
+  */
   require_once('./include/config.php');
   require_once('./include/adp_API.php');
 
@@ -16,19 +19,22 @@
 
   // 統一接變數
   $vCond = array();
-  if ('' !== $_POST['select_date']) {
+  if (!empty($_POST['select_date'])) {
     $vCond['select_date'] = $_POST['select_date'];
   }
-  if ('' !== $_POST['select_subject']) {
+  if (!empty($_POST['select_subject'])) {
     $vCond['select_subject'] = $_POST['select_subject'];
   }
-  if ('' !== $_POST['select_class']) {
+  if (!empty($_POST['select_class'])) {
     $vCond['select_class'] = $_POST['select_class'];
   }
-
-  $sTip = '';
-  if (empty($vCond)) $sTip = '請輸入查詢條件';
-
+  if (!empty($_POST['select_version'])) {
+    $vCond['select_version'] = $_POST['select_version'];
+  }
+  $sSetcondition = '';
+  if (empty($vCond)) {
+    $sSetcondition = '請輸入查詢條件或查無資料';
+  }
 
   // 取得主要資料
   $vReportData = getRecodeData();
@@ -39,32 +45,81 @@
   // 下拉選單條件設定
   $sCondSelect = getSelector();
 
+  // 查詢條件顯示
+  $sUserSearch = getCondetionRange($vCond);
+
   // 整理資料, 統一變數傳至HTML
-  $sJSOject = arraytoJS(array('tip' => $sTip,
+  $sJSOject = arraytoJS(array('setcondition' => $sSetcondition,
                               'Report' => $vReportData['remedial']['report'],
                               'concept' => $vReportData['concept'],
                               'indicator_item' => $vReportData['remedial']['indicator_item']));
 
-
 function getRecodeData() {
   global $dbh, $vUserData, $vCond;
 
-  // 1.先取得考試基本資料
+  $sVersion = $vCond['select_version'];
+  $sExamDate = $vCond['select_date'];
+  $sClass = $vCond['select_class'];
+  $sSubjectSn = $vCond['select_subject'];
+  $sMapSn = subject2mapSN($sSubjectSn);
+
+  // !!
+  // $vSQLConjunctions = array('');
+  // for ($i=0,$iMax=count($vCond)-1; $i<$iMax ; $i++) {
+  for ($i=0,$iMax=count($vCond); $i<$iMax ; $i++) {
+    $vSQLConjunctions[] = 'AND';
+  }
+
+  // 1.查詢考試基本資料
   $sPrioriSQL = "SELECT * FROM exam_record_priori
-  LEFT JOIN concept_priori ON exam_record_priori.cp_id = concept_priori.cp_id";
+  LEFT JOIN concept_priori ON exam_record_priori.cp_id = concept_priori.cp_id
+  LEFT JOIN map_node_student_status ON exam_record_priori.user_id = map_node_student_status.user_id
+  LEFT JOIN user_info ON user_info.user_id = exam_record_priori.user_id";
+  if (!empty($vCond)) {
+    // !!
+    // $sPrioriSQL.= " WHERE ";
+    $sPrioriSQL.= " WHERE map_node_student_status.map_sn IN('".subject2mapSN(2)."') ";
+  }
+
+  if (!empty($sSubjectSn)) {
+    $sPrioriSQL.= array_shift($vSQLConjunctions)." subject_id IN('$sSubjectSn') ";
+  }
+  // !!
+  // if (!empty($sMapSn)) {
+  //   $sPrioriSQL.= array_shift($vSQLConjunctions)." map_node_student_status.map_sn IN('$sMapSn') ";
+  // }
+  if (!empty($sVersion)) {
+    $sPrioriSQL.= array_shift($vSQLConjunctions)." version IN('$sVersion') ";
+  }
+  if (!empty($sExamDate)) {
+    $sPrioriSQL.= array_shift($vSQLConjunctions)." exam_record_priori.date like('%$sExamDate%') ";
+  }
+  if (!empty($vCond)) {
+    $sPrioriSQL.= " ORDER BY exam_record_priori.user_id ";
+  }
 
   $oPriori = $dbh->prepare($sPrioriSQL);
   $oPriori->execute();
   $vPrioriData = $oPriori->fetchAll(\PDO::FETCH_ASSOC);
 
+  // 2.取得查詢條件
+  $sConditionSQL = "SELECT * FROM exam_record_priori
+  LEFT JOIN concept_priori ON exam_record_priori.cp_id = concept_priori.cp_id
+  LEFT JOIN map_node_student_status ON exam_record_priori.user_id = map_node_student_status.user_id";
+  $oCondition = $dbh->prepare($sConditionSQL);
+  $oCondition->execute();
+  $vCondition = $oCondition->fetchAll(\PDO::FETCH_ASSOC);
+
   $vCondSelect = array();
-  foreach($vPrioriData as $vData) {
+  foreach($vCondition as $vData) {
     $vCondSelect['date'][] = substr($vData['date'],0 ,10);
     $vCondSelect['subject'][] = $vData['subject_id'];
+    $vCondSelect['version'][] = $vData['version'];
   }
 
   // 2.對應老師和教學科目
-  $sSub = implode(array_unique($vCondSelect['subject']), "','");
+  // !! $sSub = implode(array_unique($vCondSelect['subject']), "','");
+  $sSub = 2; // 暫時只顯示數學
   $sUserID = $vUserData['user_id'];
 
   $sClassSQL = "SELECT * FROM seme_teacher_subject WHERE teacher_id LIKE '%$sUserID%'
@@ -80,11 +135,13 @@ function getRecodeData() {
 
   // 將資料整理回 $vPrioriData, Return用
   $vPrioriData['Condition'] = array();
+  $vPrioriData['Condition']['version'] = array_unique($vCondSelect['version']);
   $vPrioriData['Condition']['date'] = array_unique($vCondSelect['date']);
   $vPrioriData['Condition']['subject'] = array_unique($vCondSelect['subject']);
   $vPrioriData['Condition']['class'] = array_unique($vCondSelect['class']);
 
-  // echo $sClassSQL;
+
+  // echo 'Priori: '.$sPrioriSQL;
   // echo '<pre>';
   // print_r($vPrioriData);
   return $vPrioriData;
@@ -100,17 +157,26 @@ function handleData() {
     $vUser = explode('-', $vData['user_id']);
     $vPrioriRemedyRate = explode(_SPLIT_SYMBOL, $vData['priori_remedy_rate']);
     $vIndicatorItem = explode(_SPLIT_SYMBOL, $vData['indicator_item']);
+    $vBigNodeStatus = unserialize($vData['bNodes_Status']);
+    $vAdpNodeStatus = array();
+    foreach ($vIndicatorItem as $key => $vItem) {
+      if (empty($vBigNodeStatus[$vItem]['bstatus:'])) $vBigNodeStatus[$vItem]['bstatus:'] = '';
+      $vAdpNodeStatus[$key]['adpstatus'] = $vBigNodeStatus[$vItem]['bstatus:'];
+      $vAdpNodeStatus[$key]['priori'] = $vPrioriRemedyRate[$key];
+    }
 
     $vNewData[] = array(
       'cp_id' => $vData['cp_id'],
       'concept' => $vData['concept'],
-      'user_name' => id2uname($vData['user_id']),
+      'user_name' => $vData['uname'],
       'user_id' => $vUser[1],
-      'priori_remedy_rate' => $vPrioriRemedyRate
+      'priori_remedy_rate' => $vAdpNodeStatus
     );
     $vReportData['remedial']['report'] = $vNewData;
   }
   $vReportData['remedial']['indicator_item'] = $vIndicatorItem;
+
+  // 標題，取第一筆資料的為主
   $vReportData['concept'] = $vNewData[0]['concept'];
 
   // echo '<pre>';
@@ -126,7 +192,7 @@ function getSelector() {
 
   $vSelect = array();
   $vSelect[] = '<select id="select_date" name="select_date">';
-  $vSelect[] =   '<option value="">請選擇(日期)</option>';
+  $vSelect[] =   '<option value="">日期</option>';
   if (!$bDataEmpty) {
     foreach ($vReportData['Condition']['date'] as $sDate) {
       $vSelect[] = '<option value="'.$sDate.'">'.$sDate.'</option>';
@@ -134,7 +200,7 @@ function getSelector() {
   }
   $vSelect[] = '</select>';
   $vSelect[] = '<select id="select_subject" name="select_subject">';
-  $vSelect[] =   '<option value="">請選擇(科別)</option>';
+  $vSelect[] =   '<option value="">科別</option>';
   if (!$bDataEmpty) {
     foreach ($vReportData['Condition']['subject'] as $sSubject) {
       $vSelect[] = '<option value="'.$sSubject.'">'.id2subject($sSubject).'</option>';
@@ -142,75 +208,143 @@ function getSelector() {
   }
   $vSelect[] = '</select>';
   $vSelect[] = '<select id="select_class" name="select_class">';
-  $vSelect[] =   '<option value="">請選擇(班級)</option>';
+  $vSelect[] =   '<option value="">班級</option>';
   if (!$bDataEmpty) {
     foreach ($vReportData['Condition']['class'] as $sClass) {
       $vSelect[] = '<option value="'.$sClass.'">'.  $sClass.'</option>';
     }
   }
   $vSelect[] = '</select>';
+  $vSelect[] = '<select id="select_version" name="select_version">';
+  $vSelect[] =   '<option value="">第幾次匯入</option>';
+  if (!$bDataEmpty) {
+    foreach ($vReportData['Condition']['version'] as $sVersion) {
+      $vSelect[] = '<option value="'.$sVersion.'">'.  $sVersion.'</option>';
+    }
+  }
+  $vSelect[] = '</select>';
 
   return implode('', $vSelect);
+}
+
+function getCondetionRange($vCond) {
+
+  if (!empty($vCond['select_date'])) {
+    $sUserSearch = $vCond['select_date'].' / ';
+  }
+  else {
+    $sUserSearch = '全部時間 / ';
+  }
+
+  if (!empty($vCond['select_subject'])) {
+    $sUserSearch .= id2subject($vCond['select_subject']).' / ';
+  }
+  else {
+    $sUserSearch .= '全部科別 / ';
+  }
+
+  if (!empty($vCond['select_class'])) {
+    $sUserSearch .= $vCond['select_class'].' / ';
+  }
+  else {
+    $sUserSearch .= '全部班級 / ';
+  }
+
+  if (!empty($vCond['select_version'])) {
+    $sUserSearch .= '第 '.$vCond['select_version'].' 次匯入';
+  }
+  else {
+    $sUserSearch .= '全部匯入次數';
+  }
+
+  return $sUserSearch;
 }
 ?>
 <!DOCTYPE html>
 <html>
 <style>
-.tippic {display:inline-table;font-size:15px;white-space:nowrap;}
-.tippic > dd {display:table-row;}
-.tippic > dd > * {display:table-cell;}
-.tippic > dd > i {font-style:normal;}
+  .tippic {display:inline-table;font-size:15px;white-space:nowrap;padding-top:40px;}
+  .tippic > dd {display:table-row;}
+  .tippic > dd > * {display:table-cell;}
+  .tippic > dd > i {font-style:normal;}
 
-/* 外層 */
-.tbl_content {display:flex;}
+  /* 外層 */
+  .tbl_content {display:flex;}
 
-/* 節點TABLE */
-.scroll_detail {flex:1;display:inline-block;overflow:auto;white-space:nowrap;}
-/* .scroll_detail > .tbl_detail > tbody > tr > td */
-.scroll_detail > .tbl_detail .rem_point {display:inline-block;width:50%;border-right: 1px solid #000;}
-.scroll_detail > .tbl_detail .adp_point {display:inline-block;width:50%;}
-.scroll_detail > .tbl_detail .assign_mission {display:block;border-top: 1px solid #000;}
-.scroll_detail > .tbl_detail .assign_mission > input {transform:scale(1.5);}
-/* scrollbar */
-.scroll_detail::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
-.scroll_detail::-webkit-scrollbar {height:10px; width: 10px;background-color: #F5F5F5;}
-.scroll_detail::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
+  /* 節點TABLE */
+  .scroll_detail {flex:1;display:inline-block;overflow:auto;white-space:nowrap;}
+  /* .scroll_detail > .tbl_detail > tbody > tr > td */
+  .scroll_detail > .tbl_detail .rem_point {display:inline-block;width:50%;border-right: 1px solid #000;}
+  .scroll_detail > .tbl_detail .adp_point {display:inline-block;width:50%;vertical-align:middle;}
+  .scroll_detail > .tbl_detail .adp_point > i {margin-left:8px;}
+  .scroll_detail > .tbl_detail .assign_mission {display:block;border-top: 1px solid #000;}
+  .scroll_detail > .tbl_detail .assign_mission > input {transform:scale(1.5);}
+  /* scrollbar */
+  .scroll_detail::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
+  .scroll_detail::-webkit-scrollbar {height:10px; width: 10px;background-color: #F5F5F5;}
+  .scroll_detail::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
 
-/* 共用 */
-.scroll_detail > .tbl_detail , .tbl_head , .tbl_foot {border:2px solid rgb(160,160,143);border-collapse:collapse;border-spacing:0px;}
-.scroll_detail > .tbl_detail, .scroll_detail > .tbl_detail > thead > tr > th:first-child, .scroll_detail > .tbl_detail > tbody > tr > td:first-child {border-left:none;}
-.scroll_detail > .tbl_detail > thead > tr > th:last-child, .scroll_detail > .tbl_detail > tbody > tr > td:last-child  {border-right:none;}
-.scroll_detail > .tbl_detail > thead > tr > th, .tbl_head > thead > tr > th, .tbl_foot > thead > tr > th {padding:10px 20px 10px 20px;text-align:center;background-color:rgb(196, 227, 191);border:2px solid rgb(160,160,143);}
-.scroll_detail > .tbl_detail > tbody > tr > td, .tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td {text-align:center;border:2px solid rgb(160,160,143);}
+  /* 共用 */
+  .scroll_detail > .tbl_detail , .tbl_head , .tbl_foot {border:2px solid rgb(160,160,143);border-collapse:collapse;border-spacing:0px;}
+  .scroll_detail > .tbl_detail, .scroll_detail > .tbl_detail > thead > tr > th:first-child, .scroll_detail > .tbl_detail > tbody > tr > td:first-child {border-left:none;}
+  .scroll_detail > .tbl_detail > thead > tr > th:last-child, .scroll_detail > .tbl_detail > tbody > tr > td:last-child  {border-right:none;}
+  .scroll_detail > .tbl_detail > thead > tr > th, .tbl_head > thead > tr > th, .tbl_foot > thead > tr > th {padding:10px 20px 10px 20px;text-align:center;background-color:rgb(196, 227, 191);border:2px solid rgb(160,160,143);}
+  .scroll_detail > .tbl_detail > tbody > tr > td, .tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td {text-align:center;border:2px solid rgb(160,160,143);}
+  .tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td  {height:64px;width:90px;}
+  .tbl_head > tbody > tr:last-of-type, .tbl_foot > tbody > tr:last-of-type {height:75px;}
 
-/* .tbl_head 學生姓名 TABLE */
-.tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td  {height:64px;width:90px;}
+  /* .tbl_foot 任務 TABLE */
+  .tbl_foot {margin-left:-6px;z-index:0}
+  .tbl_foot > tbody > tr > td {background-color:#FFF;}
 
-/* .tbl_foot 任務 TABLE */
-.tbl_foot {margin-left:-6px;z-index:0}
-.tbl_foot > tbody > tr > td {background-color:#FFF;}
-
-.rem_naver {width:30px;background-image:url('./images/start/p5-4-01.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
-.rem_help {width:30px;background-image:url('./images/start/p5-4-02.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
-.rem_pass {width:30px;background-image:url('./images/start/p5-4-03.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
+  .rem_naver {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-01.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
+  .rem_help {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-02.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
+  .rem_pass {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-03.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.13/vue.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
 <script>
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
 
   $(function () {
+    $('#btn_query').click(function (){
+      $.LoadingOverlay("show");
+    });
+
     $(document).ready(function () {
       $('#div_title').html(oItem.concept);
+      $.LoadingOverlay("show");
+
+      if ('' !== oItem.setcondition) {
+        $('#div_remedial').html('<div>' + oItem.setcondition + '</div>');
+        $.LoadingOverlay("hide");
+        return;
+      }
+      if (null == oItem.Report) {
+        $('#div_remedial').html('<div>報表條件：<?php echo $sUserSearch; ?>查無資料</div>');
+        $.LoadingOverlay("hide");
+        return;
+      }
 
       // Vue
       var vueRemedial = new Vue({
         el: '#div_remedial',
         data: oItem,
+        mounted: function () {
+          $.LoadingOverlay("hide");
+        },
         methods: {
-          matchClass: function(sBridge, oArg) {
-            switch (sBridge) {
-              case 'rem_point':
-                return ('△' == oArg.data) ? 'sans-serif' : '';
+          matchClass: function(sAdpStatus) {
+            switch (sAdpStatus) {
+              case '0':
+                return 'rem_help';
+                break;
+              case '1':
+                return 'rem_pass';
+                break;
+
+              default:
+                return 'rem_naver';
                 break;
             }
           }
@@ -259,7 +393,7 @@ function getSelector() {
           </dd>
         </dl>
       </div>
-      <span>測驗班級：</span>
+      <span id="tipshow">報表條件：<?php echo $sUserSearch ?></span>
 
       <div class="tbl_content">
         <table class="tbl_head">
@@ -285,10 +419,12 @@ function getSelector() {
             </thead>
             <tbody>
               <tr v-for="oReport in Report">
-                <td v-for="item in oReport.priori_remedy_rate" style="width:100px;">
-                  <span class="rem_point" style="font-family:sans-serif">{{item}}</span>
-                  <span class="adp_point"></span>
-                  <label class="assign_mission"><input type="checkbox"></label>
+                <td v-for="oItem in oReport.priori_remedy_rate">
+                  <div>
+                    <span class="rem_point" style="font-family:sans-serif">{{oItem.priori}}</span>
+                    <span class="adp_point"><i v-bind:class="matchClass(oItem.adpstatus)"></i></span>
+                    <label class="assign_mission"><input type="checkbox"></label>
+                  </div>
                 </td>
               </tr>
             </tbody>
