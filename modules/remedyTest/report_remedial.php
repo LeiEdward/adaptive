@@ -2,7 +2,6 @@
   /*
     TODO 2018-01-04: Edward 暫時只顯示數學科目，其他科目只需微調有!!註記部分
   */
-  require_once('./include/config.php');
   require_once('./include/adp_API.php');
 
   if (!isset($_SESSION)) {
@@ -96,7 +95,7 @@ function getRecodeData() {
     $sPrioriSQL.= array_shift($vSQLConjunctions)." version IN('$sVersion') ";
   }
   if (!empty($sExamDate)) {
-    $sPrioriSQL.= array_shift($vSQLConjunctions)." exam_record_priori.date like('%$sExamDate%') ";
+    $sPrioriSQL.= array_shift($vSQLConjunctions)." concept_priori.exam_range like('%$sExamDate%') ";
   }
   if (!empty($vCond)) {
     $sPrioriSQL.= " ORDER BY exam_record_priori.user_id ";
@@ -116,7 +115,7 @@ function getRecodeData() {
 
   $vCondSelect = array();
   foreach($vCondition as $vData) {
-    $vCondSelect['date'][] = substr($vData['date'],0 ,10);
+    $vCondSelect['exam_range'][] = $vData['exam_range'];
     $vCondSelect['subject'][] = $vData['subject_id'];
     $vCondSelect['version'][] = $vData['version'];
   }
@@ -140,7 +139,7 @@ function getRecodeData() {
   // 將資料整理回 $vPrioriData, Return用
   $vPrioriData['Condition'] = array();
   $vPrioriData['Condition']['version'] = array_unique($vCondSelect['version']);
-  $vPrioriData['Condition']['date'] = array_unique($vCondSelect['date']);
+  $vPrioriData['Condition']['date'] = array_unique($vCondSelect['exam_range']);
   $vPrioriData['Condition']['subject'] = array_unique($vCondSelect['subject']);
   $vPrioriData['Condition']['class'] = array_unique($vCondSelect['class']);
 
@@ -281,8 +280,6 @@ function getCondetionRange() {
   return $sUserSearch;
 }
 ?>
-<!DOCTYPE html>
-<html>
 <style>
   .tippic {display:inline-table;font-size:15px;white-space:nowrap;padding-top:40px;}
   .tippic > dd {display:table-row;}
@@ -298,12 +295,17 @@ function getCondetionRange() {
   .scroll_detail > .tbl_detail .rem_point {display:inline-block;width:50%;border-right: 1px solid #000;}
   .scroll_detail > .tbl_detail .adp_point {display:inline-block;width:50%;vertical-align:middle;}
   .scroll_detail > .tbl_detail .adp_point > i {margin-left:8px;}
-  .scroll_detail > .tbl_detail .assign_mission {display:block;border-top: 1px solid #000;}
-  .scroll_detail > .tbl_detail .assign_mission > input {transform:scale(1.5);}
+  .scroll_detail > .tbl_detail .assign_mission {display:block;border-top: 1px solid #000;cursor:pointer;}
+  .scroll_detail > .tbl_detail .assign_mission > input {transform:scale(1.5);cursor:pointer;}
+
   /* scrollbar */
   .scroll_detail::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
   .scroll_detail::-webkit-scrollbar {height:10px; width: 10px;background-color: #F5F5F5;}
   .scroll_detail::-webkit-scrollbar-thumb {border-radius: 10px;-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);background-color: #555;}
+
+  /* .tbl_foot 任務 TABLE */
+  .tbl_foot {margin-left:-6px;z-index:0}
+  .tbl_foot > tbody > tr > td {background-color:#FFF;}
 
   /* 共用 */
   .scroll_detail > .tbl_detail , .tbl_head , .tbl_foot {border:2px solid rgb(160,160,143);border-collapse:collapse;border-spacing:0px;}
@@ -314,10 +316,7 @@ function getCondetionRange() {
   .tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td  {height:64px;width:90px;}
   .tbl_head > tbody > tr:last-of-type, .tbl_foot > tbody > tr:last-of-type {height:75px;}
 
-  /* .tbl_foot 任務 TABLE */
-  .tbl_foot {margin-left:-6px;z-index:0}
-  .tbl_foot > tbody > tr > td {background-color:#FFF;}
-
+  /* 其他 */
   .rem_naver {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-01.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
   .rem_help {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-02.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
   .rem_pass {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-03.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
@@ -342,7 +341,7 @@ function getCondetionRange() {
         return;
       }
       if (null == oItem.Report) {
-        $('#div_remedial').html('<div>報表條件：<?php echo $sUserSearch; ?>查無資料</div>');
+        $('#div_remedial').html('<div>報表條件：<?php echo $sUserSearch; ?> 查無資料</div>');
         $.LoadingOverlay("hide");
         return;
       }
@@ -353,6 +352,7 @@ function getCondetionRange() {
         data: oItem,
         mounted: function () {
           $.LoadingOverlay("hide");
+          $('.venobox').venobox();
         },
         methods: {
           matchClass: function(sAdpStatus) {
@@ -431,6 +431,7 @@ function getCondetionRange() {
           </tbody>
         </table>
 
+        <!-- <div class="scrollbar"></div> -->
         <div class="scroll_detail">
           <table class="tbl_detail">
             <thead>
@@ -461,7 +462,10 @@ function getCondetionRange() {
           <tbody>
             <tr v-for="item in Report">
               <td>
-                <i class="fa fa-edit"></i>
+                <!-- <a class="venobox" data-type="iframe" href="http://adaptive-learning.ntcu.edu.tw/aialtest/modules.php?op=modload&name=remedyTest&file=remedial_mission"> -->
+                <a class="venobox" data-type="iframe" href="modules\remedyTest\remedial_mission.php">
+                  <i class="fa fa-edit"></i>
+                </a>
               </td>
             </tr>
           </tbody>
@@ -469,5 +473,3 @@ function getCondetionRange() {
       </div>
     </div>
   </div>
-</body>
-</html>
