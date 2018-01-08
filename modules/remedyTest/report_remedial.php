@@ -164,6 +164,11 @@ function handleData() {
     $vAdpNodeStatus = array();
     foreach ($vIndicatorItem as $key => $vItem) {
       if (empty($vBigNodeStatus[$vItem]['bstatus:'])) $vBigNodeStatus[$vItem]['bstatus:'] = '';
+      if (!empty($_SESSION['remedyTest'][$vData['user_id']][$vItem]) && 'true' == $_SESSION['remedyTest'][$vData['user_id']][$vItem]) {
+        $vAdpNodeStatus[$key]['select'] = 'checked';
+      }
+      $vAdpNodeStatus[$key]['nodename'] = $vItem;
+      $vAdpNodeStatus[$key]['student'] = $vUser[1];
       $vAdpNodeStatus[$key]['adpstatus'] = $vBigNodeStatus[$vItem]['bstatus:'];
       $vAdpNodeStatus[$key]['priori'] = $vPrioriRemedyRate[$key];
     }
@@ -290,13 +295,19 @@ function getCondetionRange() {
   .tbl_content {display:flex;}
 
   /* 節點TABLE */
-  .scroll_detail {flex:1;display:inline-block;overflow:auto;white-space:nowrap;}
-  /* .scroll_detail > .tbl_detail > tbody > tr > td */
-  .scroll_detail > .tbl_detail .rem_point {display:inline-block;width:50%;border-right: 1px solid #000;}
+  .scroll_detail {flex:1;display:inline-block;overflow:hidden;overflow-x:auto;}
+  .scroll_detail > .tbl_detail > * > * > * {white-space:nowrap;}
+  .scroll_detail > .tbl_detail > tbody > tr > td > div {height:61px;}
+  .scroll_detail > .tbl_detail > tbody > tr > td > div > span {vertical-align:middle;}
+
+  .scroll_detail > .tbl_detail .rem_point {position:relative;display:inline-block;width:50%;height:33px;border-right:1px solid #000;}
+  .scroll_detail > .tbl_detail .rem_point > ins {text-decoration:none;}
+
   .scroll_detail > .tbl_detail .adp_point {display:inline-block;width:50%;vertical-align:middle;}
   .scroll_detail > .tbl_detail .adp_point > i {margin-left:8px;}
-  .scroll_detail > .tbl_detail .assign_mission {display:block;border-top: 1px solid #000;cursor:pointer;}
-  .scroll_detail > .tbl_detail .assign_mission > input {transform:scale(1.5);cursor:pointer;}
+
+  .scroll_detail > .tbl_detail .assign_mission {display:block;height:35px;border-top: 1px solid #000;cursor:pointer;}
+  .scroll_detail > .tbl_detail .assign_mission > input {transform:scale(1.5);cursor:pointer;height:27px;}
 
   /* scrollbar */
   .scroll_detail::-webkit-scrollbar-track {-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);border-radius: 10px;background-color: #F5F5F5;}
@@ -313,8 +324,8 @@ function getCondetionRange() {
   .scroll_detail > .tbl_detail > thead > tr > th:last-child, .scroll_detail > .tbl_detail > tbody > tr > td:last-child  {border-right:none;}
   .scroll_detail > .tbl_detail > thead > tr > th, .tbl_head > thead > tr > th, .tbl_foot > thead > tr > th {padding:10px 20px 10px 20px;text-align:center;background-color:rgb(196, 227, 191);border:2px solid rgb(160,160,143);}
   .scroll_detail > .tbl_detail > tbody > tr > td, .tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td {text-align:center;border:2px solid rgb(160,160,143);}
-  .tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td  {height:64px;width:90px;}
-  .tbl_head > tbody > tr:last-of-type, .tbl_foot > tbody > tr:last-of-type {height:75px;}
+  .tbl_head > tbody > tr > td, .tbl_foot > tbody > tr > td  {height:63px;width:90px;}
+  .tbl_head > tbody > tr:last-of-type, .tbl_foot > tbody > tr:last-of-type {height:74px;}
 
   /* 其他 */
   .rem_naver {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-01.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
@@ -353,6 +364,29 @@ function getCondetionRange() {
         mounted: function () {
           $.LoadingOverlay("hide");
           $('.venobox').venobox();
+
+          $('.assign_mission > input[type="checkbox"]').change(function (e) {
+            var oPost = {};
+            oPost.checked = 'false';
+            if ($(this).is(":checked")) {
+              oPost.checked = 'true';
+            }
+            oPost.status = 'checking';
+            oPost.data = this.id;
+            $.ajax({
+                url: './modules/remedyTest/remedial_mission.php',
+                data: oPost,
+                method: "POST",
+                success: function (sRtn) {
+                  // console.log(sRtn);
+                },
+                error: function (jqXHR, textStatus, errorMessage) {
+                  alert('該任務選擇失敗, 請重新勾選');
+                  this.checked = false;
+                }
+            });
+          });
+
         },
         methods: {
           matchClass: function(sAdpStatus) {
@@ -366,6 +400,22 @@ function getCondetionRange() {
 
               default:
                 return 'rem_naver';
+                break;
+            }
+          },
+          matchStyle: function(sPriorStatus) {
+            switch (sPriorStatus) {
+              case 'Ｏ':
+              case 'Ｘ':
+                return '';
+                break;
+
+              default:
+                return {'font-family':'fantasy',
+                        'position':'absolute',
+                        'font-size':'24px',
+                        'bottom':'3px',
+                        'left':'18px'};
                 break;
             }
           }
@@ -414,7 +464,7 @@ function getCondetionRange() {
           </dd>
         </dl>
       </div>
-      <span id="tipshow">報表條件：<?php echo $sUserSearch ?></span>
+      <span id="tipshow">報表條件：<?php echo $sUserSearch; ?></span>
 
       <div class="tbl_content">
         <table class="tbl_head">
@@ -443,9 +493,11 @@ function getCondetionRange() {
               <tr v-for="oReport in Report">
                 <td v-for="oItem in oReport.priori_remedy_rate">
                   <div>
-                    <span class="rem_point" style="font-family:sans-serif">{{oItem.priori}}</span>
+                    <span class="rem_point"><ins v-bind:style="matchStyle(oItem.priori)">{{oItem.priori}}<ins></span>
                     <span class="adp_point"><i v-bind:class="matchClass(oItem.adpstatus)"></i></span>
-                    <label class="assign_mission"><input type="checkbox"></label>
+                    <label class="assign_mission">
+                      <input v-bind:id="oItem.student + '>>>' + oItem.nodename" type="checkbox" v-bind:checked="oItem.select">
+                    </label>
                   </div>
                 </td>
               </tr>
@@ -463,7 +515,7 @@ function getCondetionRange() {
             <tr v-for="item in Report">
               <td>
                 <!-- <a class="venobox" data-type="iframe" href="http://adaptive-learning.ntcu.edu.tw/aialtest/modules.php?op=modload&name=remedyTest&file=remedial_mission"> -->
-                <a class="venobox" data-type="iframe" href="modules\remedyTest\remedial_mission.php">
+                <a class="venobox" data-type="iframe" v-bind:href="'modules\\remedyTest\\remedial_mission.php?studentid=' + item.user_id">
                   <i class="fa fa-edit"></i>
                 </a>
               </td>
