@@ -3,6 +3,7 @@
     TODO 2018-01-04: Edward 暫時只顯示數學科目，其他科目只需微調有!!註記部分
   */
   require_once('./include/adp_API.php');
+  require_once('./modules/remedyTest/print_prioriData.php');
 
   if (!isset($_SESSION)) {
     session_start();
@@ -32,7 +33,7 @@
   }
   $sSetcondition = '';
   if (empty($vCond)) {
-    $sSetcondition = '請輸入查詢條件或查無資料';
+    $sSetcondition = '請輸入查詢條件';
   }
 
   // 取得主要資料
@@ -105,6 +106,20 @@ function getRecodeData() {
   $oPriori->execute();
   $vPrioriData = $oPriori->fetchAll(\PDO::FETCH_ASSOC);
 
+  // 取得所有已有派過任務的學生節點狀態
+  $vStudent = array();
+  $vCpid = array();
+  foreach ($vPrioriData as $iIndex => $vExamData) {
+    $vStudent[] = $vExamData['user_id'];
+    $vCpid[] = $vExamData['cp_id'];
+  }
+  $sStudent = implode("','", $vStudent);
+  $sCpid = implode("','", $vCpid);
+  $sMissionSQL = "SELECT * FROM mission_info WHERE target_id IN ('$sStudent') AND cp_id IN ('$sCpid')";
+  $oMission = $dbh->prepare($sMissionSQL);
+  $oMission->execute();
+  $vMission = $oMission->fetchAll(\PDO::FETCH_ASSOC);
+
   // 2.取得查詢條件
   $sConditionSQL = "SELECT * FROM exam_record_priori
   LEFT JOIN concept_priori ON exam_record_priori.cp_id = concept_priori.cp_id
@@ -120,7 +135,7 @@ function getRecodeData() {
     $vCondSelect['version'][] = $vData['version'];
   }
 
-  // 2.對應老師和教學科目
+  // 3.對應老師和教學科目
   // !! $sSub = implode(array_unique($vCondSelect['subject']), "','");
   $sSub = 2; // 暫時只顯示數學
   $sUserID = $vUserData['user_id'];
@@ -143,6 +158,8 @@ function getRecodeData() {
   $vPrioriData['Condition']['subject'] = array_unique($vCondSelect['subject']);
   $vPrioriData['Condition']['class'] = array_unique($vCondSelect['class']);
 
+  $vPrioriData['Mission'] = array();
+  $vPrioriData['Mission'] = $vMission;
 
   // echo 'Priori: '.$sPrioriSQL;
   // echo '<pre>';
@@ -152,6 +169,11 @@ function getRecodeData() {
 
 function handleData() {
   global $vReportData;
+
+  $vMission = array();
+  foreach ($vReportData['Mission'] as $vData) {
+    $vMission[$vData['target_id']] = explode(_SPLIT_SYMBOL, $vData['node']);
+  }
 
   $vNewData = array();
   foreach ($vReportData as $vData) {
@@ -174,6 +196,10 @@ function handleData() {
         $vAdpNodeStatus[$sIndx]['select'] = 'checked';
       }
 
+      if (!empty($vMission) && in_array($sNodeName,$vMission[$vData['user_id']])) {
+        $vAdpNodeStatus[$sIndx]['select'] = 'checked';
+        $vAdpNodeStatus[$sIndx]['disabled'] = ' disabled';
+      }
       $vAdpNodeStatus[$sIndx]['cp_id'] = $vData['cp_id'];
       $vAdpNodeStatus[$sIndx]['nodename'] = $sNodeName;
       $vAdpNodeStatus[$sIndx]['student'] = $vUser[1];
@@ -183,10 +209,12 @@ function handleData() {
     // print_r($vAdpNodeStatus);
     $vNewData[] = array(
       'cp_id' => $vData['cp_id'],
+      'exam_sn' => $vData['exam_sn'],
       'subjectid' => $vData['subject_id'],
       'concept' => $vData['concept'],
       'user_name' => $vData['uname'],
       'user_id' => $vUser[1],
+      'user_id_full' => $vData['user_id'],
       'priori_remedy_rate' => $vAdpNodeStatus
     );
     $vReportData['remedial']['report'] = $vNewData;
@@ -356,7 +384,7 @@ function getCondetionRange() {
       $.LoadingOverlay("show");
 
       if ('' !== oItem.setcondition) {
-        $('#div_remedial').html('<div>' + oItem.setcondition + '</div>');
+        $('#div_remedial').html(oItem.setcondition);
         $.LoadingOverlay("hide");
         return;
       }
@@ -492,7 +520,7 @@ function getCondetionRange() {
           <tbody>
             <tr v-for="item in Report">
               <td>{{item.user_id}}</td>
-              <td>{{item.user_name}}</td>
+              <td><a class="venobox" data-type="iframe" style="text-decoration:underline;" v-bind:href="'modules.php?op=modload&name=remedyTest&file=print_prioriData&screen=frame&showperson=Y&studentid=' + item.user_id_full + '&cp_id=' + item.cp_id + '&exam_sn=' + item.exam_sn">{{item.user_name}}</td>
             </tr>
           </tbody>
         </table>
@@ -509,11 +537,10 @@ function getCondetionRange() {
               <tr v-for="oReport in Report">
                 <td v-for="oItem in oReport.priori_remedy_rate">
                   <div>
-                    <!-- {{oItem.adpstatus}} -->
                     <span class="rem_point"><ins v-bind:style="matchStyle(oItem.priori)">{{oItem.priori}}<ins></span>
                     <span class="adp_point"><i v-bind:class="matchClass(oItem.adpstatus)"></i></span>
                     <label class="assign_mission">
-                      <input v-bind:id="oItem.student + '>>>' + oItem.nodename  + '>>>' + oItem.cp_id" type="checkbox" v-bind:checked="oItem.select">
+                      <input v-bind:id="oItem.student + '>>>' + oItem.nodename  + '>>>' + oItem.cp_id" type="checkbox" v-bind:checked="oItem.select" v-bind:disabled="oItem.disabled">
                     </label>
                   </div>
                 </td>
@@ -532,7 +559,9 @@ function getCondetionRange() {
             <tr v-for="item in Report">
               <td>
                 <!-- <a class="venobox" data-type="iframe" href="http://adaptive-learning.ntcu.edu.tw/aialtest/modules.php?op=modload&name=remedyTest&file=remedial_mission"> -->
-                <a class="venobox" data-type="iframe" v-bind:href="'modules\\remedyTest\\remedial_mission.php?studentid=' + item.user_id + '&cp_id=' + item.cp_id + '&subjectid=' + item.subjectid">
+                <a class="venobox" data-type="iframe"
+                  v-bind:href="'modules\\remedyTest\\remedial_mission.php?studentid=' + item.user_id +'&cp_id=' + item.cp_id +'&subjectid=' + item.subjectid +'&studentname=' + item.user_name"
+                >
                   <i class="fa fa-edit"></i>
                 </a>
               </td>
