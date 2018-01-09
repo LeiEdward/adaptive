@@ -161,20 +161,29 @@ function handleData() {
     $vPrioriRemedyRate = explode(_SPLIT_SYMBOL, $vData['priori_remedy_rate']);
     $vIndicatorItem = explode(_SPLIT_SYMBOL, $vData['indicator_item']);
     $vBigNodeStatus = unserialize($vData['bNodes_Status']);
-    $vAdpNodeStatus = array();
-    foreach ($vIndicatorItem as $key => $vItem) {
-      if (empty($vBigNodeStatus[$vItem]['bstatus:'])) $vBigNodeStatus[$vItem]['bstatus:'] = '';
-      if (!empty($_SESSION['remedyTest'][$vData['user_id']][$vItem]) && 'true' == $_SESSION['remedyTest'][$vData['user_id']][$vItem]) {
-        $vAdpNodeStatus[$key]['select'] = 'checked';
-      }
-      $vAdpNodeStatus[$key]['nodename'] = $vItem;
-      $vAdpNodeStatus[$key]['student'] = $vUser[1];
-      $vAdpNodeStatus[$key]['adpstatus'] = $vBigNodeStatus[$vItem]['bstatus:'];
-      $vAdpNodeStatus[$key]['priori'] = $vPrioriRemedyRate[$key];
-    }
+    // echo $vData['user_id'].'<br/>';
+    // print_r($vBigNodeStatus);
+    // echo '<pre>';
 
+    $vAdpNodeStatus = array();
+    foreach ($vIndicatorItem as $sIndx => $sNodeName) {
+      if ('' == $vBigNodeStatus[$sNodeName]['bstatus:'] && '0' != $vBigNodeStatus[$sNodeName]['bstatus:']) {
+        $vBigNodeStatus[$sNodeName]['bstatus:'] = '-1';
+      }
+      if (!empty($_SESSION['remedyTest'][$vData['cp_id']][$vData['user_id']][$sNodeName]) && 'true' == $_SESSION['remedyTest'][$vData['cp_id']][$vData['user_id']][$sNodeName]) {
+        $vAdpNodeStatus[$sIndx]['select'] = 'checked';
+      }
+
+      $vAdpNodeStatus[$sIndx]['cp_id'] = $vData['cp_id'];
+      $vAdpNodeStatus[$sIndx]['nodename'] = $sNodeName;
+      $vAdpNodeStatus[$sIndx]['student'] = $vUser[1];
+      $vAdpNodeStatus[$sIndx]['adpstatus'] = $vBigNodeStatus[$sNodeName]['bstatus:'];
+      $vAdpNodeStatus[$sIndx]['priori'] = $vPrioriRemedyRate[$sIndx];
+    }
+    // print_r($vAdpNodeStatus);
     $vNewData[] = array(
       'cp_id' => $vData['cp_id'],
+      'subjectid' => $vData['subject_id'],
       'concept' => $vData['concept'],
       'user_name' => $vData['uname'],
       'user_id' => $vUser[1],
@@ -367,18 +376,26 @@ function getCondetionRange() {
 
           $('.assign_mission > input[type="checkbox"]').change(function (e) {
             var oPost = {};
+
+            // remedial_mission.php 判斷進入點用
+            oPost.status = 'checking';
+
+            // 節點名稱
+            oPost.data = this.id;
+
+            // 判斷是否有勾選
             oPost.checked = 'false';
             if ($(this).is(":checked")) {
               oPost.checked = 'true';
             }
-            oPost.status = 'checking';
-            oPost.data = this.id;
+            oPost.missionname = oItem.concept;
+
             $.ajax({
                 url: './modules/remedyTest/remedial_mission.php',
                 data: oPost,
                 method: "POST",
                 success: function (sRtn) {
-                  // console.log(sRtn);
+                  console.log(sRtn);
                 },
                 error: function (jqXHR, textStatus, errorMessage) {
                   alert('該任務選擇失敗, 請重新勾選');
@@ -391,14 +408,13 @@ function getCondetionRange() {
         methods: {
           matchClass: function(sAdpStatus) {
             switch (sAdpStatus) {
-              case '0':
+              case 0:
                 return 'rem_help';
                 break;
-              case '1':
+              case 1:
                 return 'rem_pass';
                 break;
-
-              default:
+              case '-1':
                 return 'rem_naver';
                 break;
             }
@@ -493,10 +509,11 @@ function getCondetionRange() {
               <tr v-for="oReport in Report">
                 <td v-for="oItem in oReport.priori_remedy_rate">
                   <div>
+                    <!-- {{oItem.adpstatus}} -->
                     <span class="rem_point"><ins v-bind:style="matchStyle(oItem.priori)">{{oItem.priori}}<ins></span>
                     <span class="adp_point"><i v-bind:class="matchClass(oItem.adpstatus)"></i></span>
                     <label class="assign_mission">
-                      <input v-bind:id="oItem.student + '>>>' + oItem.nodename" type="checkbox" v-bind:checked="oItem.select">
+                      <input v-bind:id="oItem.student + '>>>' + oItem.nodename  + '>>>' + oItem.cp_id" type="checkbox" v-bind:checked="oItem.select">
                     </label>
                   </div>
                 </td>
@@ -515,7 +532,7 @@ function getCondetionRange() {
             <tr v-for="item in Report">
               <td>
                 <!-- <a class="venobox" data-type="iframe" href="http://adaptive-learning.ntcu.edu.tw/aialtest/modules.php?op=modload&name=remedyTest&file=remedial_mission"> -->
-                <a class="venobox" data-type="iframe" v-bind:href="'modules\\remedyTest\\remedial_mission.php?studentid=' + item.user_id">
+                <a class="venobox" data-type="iframe" v-bind:href="'modules\\remedyTest\\remedial_mission.php?studentid=' + item.user_id + '&cp_id=' + item.cp_id + '&subjectid=' + item.subjectid">
                   <i class="fa fa-edit"></i>
                 </a>
               </td>
