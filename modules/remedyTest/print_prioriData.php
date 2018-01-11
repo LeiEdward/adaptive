@@ -20,7 +20,7 @@ function findIndData($ind_str, $str_map){
 	return $sub_info;
 }
 
-function prioriExamResult($user_id,$cp_id,$exam_sn){
+function prioriExamResult($user_id,$cp_id,$exam_sn,$user_name=''){
 	global $dbh;
 
 	//require_once "indicateAdaptiveTestStructure.php";
@@ -102,30 +102,47 @@ function prioriExamResult($user_id,$cp_id,$exam_sn){
 
 	}
 	//因材網目前的狀態--大節點
-	foreach( $bNodeStatus as $key=>$ary ){
-		if( $ary==null ) continue;
-		$node = $key;
-		//echo $key.':'.$ary['bstatus:'].'<br>';
-		$status = $ary['bstatus:'];
-		$ep_node2[] = $node;
-		$bNode_status_array[$node] = $status;
-		if( $status == 1 ){
-			$_SESSION[stuNodeStatus2][sNode][$node]=1;
-		}else if( $status == 0 ){
-			$_SESSION[stuNodeStatus2][sNode][$node]=0;
+	if(!empty($bNodeStatus) && is_array($bNodeStatus)){
+		foreach( $bNodeStatus as $key=>$ary ){
+			if( $ary==null ) continue;
+			$node = $key;
+			//echo $key.':'.$ary['bstatus:'].'<br>';
+			$status = $ary['bstatus:'];
+			$ep_node2[] = $node;
+			$bNode_status_array[$node] = $status;
+			if( $status == 1 ){
+				$_SESSION[stuNodeStatus2][sNode][$node]=1;
+			}else if( $status == 0 ){
+				$_SESSION[stuNodeStatus2][sNode][$node]=0;
+			}
+		}
+	}else {
+		foreach( $bNode_order as $key=>$ary ){
+			if( $ary==null ) continue;
+			$node = $key;
+			$ep_node2[] = $node;
 		}
 	}
+	
 	//因材網目前的狀態--小節點
-	foreach( $sNodeStatus as $key=>$ary ){
-		if( $ary==null ) continue;
-		$node = $key;
-		$status = $ary['status:'];
-		$ep_node[] = $node;
-		$sNode_status_array[$key] = $status;
-		if( $status == 1 ){
-			$_SESSION[stuNodeStatus][sNode][$node]=1;
-		}else{
-			$_SESSION[stuNodeStatus][sNode][$node]=0;
+	if(!empty($sNodeStatus) && is_array($sNodeStatus)){
+		foreach( $sNodeStatus as $key=>$ary ){
+			if( $ary==null ) continue;
+			$node = $key;
+			$status = $ary['status:'];
+			$ep_node[] = $node;
+			$sNode_status_array[$key] = $status;
+			if( $status == 1 ){
+				$_SESSION[stuNodeStatus][sNode][$node]=1;
+			}else{
+				$_SESSION[stuNodeStatus][sNode][$node]=0;
+			}
+		}
+	}else{
+		foreach( $sNode_order as $key=>$ary ){
+			if( $ary==null ) continue;
+			$node = $key;
+			$ep_node[] = $node;
 		}
 	}
 
@@ -151,18 +168,21 @@ function prioriExamResult($user_id,$cp_id,$exam_sn){
 		if($show_node_array[$bNode]==''){
 			continue;
 		}
-		if(array_key_exists($bNode,$bNode_status_array)){
+		if(is_array($bNode_status_array) && array_key_exists($bNode,$bNode_status_array)){
 			$bNode_status = $bNode_status_array[$bNode]; //因材網狀態：0, 1, -1
 		}else $bNode_status = -1;
 		$priori_status = $priori_status_array[$bkey]; //科技化評量的狀態：O X 三角
 
 		if($bNode_status==1){
+			$bNode_status_ch='Pass';
 			$_SESSION[stuNodeStatus2][sNode][$bNode]=1;
 			$bNode_statusHtml='<img src=".\images\start\p5-4-03.png">';
 		}else if($bNode_status==0){
+			$bNode_status_ch='noPass';
 			$_SESSION[stuNodeStatus2][sNode][$bNode]=0;
 			$bNode_statusHtml='<img src=".\images\start\p5-4-02.png">';
 		}else{
+			$bNode_status_ch='noPass';
 			$bNode_statusHtml='<img src=".\images\start\p5-4-01.png">';
 		}
 		//從大節點找小節點
@@ -172,13 +192,15 @@ function prioriExamResult($user_id,$cp_id,$exam_sn){
 			}*/
 			$status=$sNode_status_array[$sNode];
 			$data_mov = $mov_finish_rate[$sNode];
-			echo $data_mov;
+			//echo $data_mov;
 			//為了概念試題顯示的函數用
 			$loop++;
 			if($status==1){
+				$sNode_status_ch='Pass';
 				$_SESSION[stuNodeStatus][sNode][$sNode]=1;
 				$statusHtml='<a class="dialogify" ><img src=".\images\icon\O.png"></a>';
 			}else{
+				$sNode_status_ch='noPass';
 				$_SESSION[stuNodeStatus][sNode][$sNode]=0;
 				$statusHtml='
               <a class="dialogify" ><img src=".\images\icon\X.png"></a>
@@ -200,14 +222,19 @@ function prioriExamResult($user_id,$cp_id,$exam_sn){
 			if( $nodeFile[prac] ) $pracHtml='<a href="modules.php?op=modload&name=assignMission&file=ks_viewskill&ind='.$sNode.'&mid='.$nodeFile[mapping_sn].'#parentHorizontalTab2" target="_blank"><img src="./images/icon/item.png" ></a>';
 			else $pracHtml='<img src="./images/icon/item-no.png" >';
 
+			// 判斷老師身分，不顯示 進階診斷
+			$sAdvancedDiagnosisBtn = '<td> <a href="#" class="btn02">全測</a> <br> <a href="#" class="btn03">適性</a> </td>';
+			if(USER_TEACHER == $_SESSION[user_data]->access_level) {
+				$sAdvancedDiagnosisBtn = '';
+			}
 			//echo 'sNode:'.$sNode.'<br>';
 			$tmpHtml[$bNode][$sNode]='
-            <tr>
+            <tr id="node:'.$sNode.'_status:'.$sNode_status_ch.'">
             <td> <a class="show" title="'.$nodeName.'" href="modules/D3/app/index_view.php?aa='.base64_encode($_SESSION[user_id]).'&map_sn='.$map_sn.'&find_nodes='.$nodeLowNode.'" target="_blank">'.$sNode.'</a></td>
             <td> '.$statusHtml.'</td>
             <td> '.$videoHtml.'</td>
             <td> '.$pracHtml.'</td>
-            <td> <a href="#" class="btn02">全測</a> <br> <a href="#" class="btn03">適性</a> </td>
+            '.$sAdvancedDiagnosisBtn.'
             <td> <select><option>請選擇</option> </select></td></tr>
           ';
 
@@ -220,24 +247,32 @@ function prioriExamResult($user_id,$cp_id,$exam_sn){
 				if(!empty($ary2)) $tmpHtml3[$bNode].= $ary2; //implode('',$ary2)
 			}
 		}
-		$tmpHtml2[$bNode]='<tr> <td rowspan="'.($sNode_count+1).'" >'.$bNode.'</td>'.
+		$tmpHtml2[$bNode]='<tr id="node:'.$bNode.'_status:'.$bNode_status_ch.'"> <td rowspan="'.($sNode_count+1).'" >'.$bNode.'</td>'.
 				'<td rowspan="'.($sNode_count+1).'" >'.$priori_status.'</td>'.
 				'<td rowspan="'.($sNode_count+1).'" >'.$bNode_statusHtml.'</td>'.$tmpHtml3[$bNode];
 		//print_r($tmpHtml2);
+		$tableId[]='node:'.$bNode.'_status:'.$bNode_status_ch;
 	}
 
 	$reportHtml = '
       <div class="content2-Box">
         <div class="main-box">';
 	if($exam_sn==0){$reportHtml.='<div class="right-box">';}
+
+	// 判斷老師身分，不顯示 進階診斷
+	$sAdvancedDiagnosis = '<th>進階診斷</th>';
+	if(USER_TEACHER == $_SESSION[user_data]->access_level) {
+		$sAdvancedDiagnosis = '';
+	}
+
 	$reportHtml.='<div class="title01">
 			  <span>'.$report_title.'</span><br>
-              <span class="color-green">測驗班級：'.$_SESSION[user_data]->cht_class.'</span><br>
+              <span class="color-green">測驗對象：'.$_SESSION[user_data]->cht_class.' '.$user_name.'</span><br>
               <span class="color-green">目前狀態：全部'.'</span>
             </div>
             <div class="table_scroll">
             <table class="datatable">
-              <tr>
+              <tr class="tableTitle" id="tabTitle_'.implode('_',$tableId).'">
                 <th>能力指標</th>
                 <th>科技化<br>評量結果</th>
             	<th>因材網<br>指標狀態</th>
@@ -245,8 +280,8 @@ function prioriExamResult($user_id,$cp_id,$exam_sn){
                 <th>節點狀態</th>
                 <th>影片</th>
                 <th>練習題</th>
-              	<th>進階診斷</th>
-              	<th>診斷報告</th>
+              	'.$sAdvancedDiagnosis.'
+								<th>診斷報告</th>
               </tr>
                 '.implode('',$tmpHtml2).'
             </table>
@@ -262,8 +297,10 @@ function prioriExamResult($user_id,$cp_id,$exam_sn){
 
 if (isset($_GET['showperson']) && 'Y' === $_GET['showperson']) {
 	$user_id = $_GET['studentid'];
+	$user_name = $_GET['user_name'];
 	$cp_id = $_GET['cp_id'];
 	$exam_sn = $_GET['exam_sn'];
-	
-	echo prioriExamResult($user_id,$cp_id,$exam_sn);
+	$vUserData = get_object_vars($_SESSION['user_data']);
+
+	echo prioriExamResult($user_id,$cp_id,$exam_sn, $user_name);
 }

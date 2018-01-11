@@ -92,6 +92,10 @@ function getRecodeData() {
   // if (!empty($sMapSn)) {
   //   $sPrioriSQL.= array_shift($vSQLConjunctions)." map_node_student_status.map_sn IN('$sMapSn') ";
   // }
+  if (!empty($sClass)) {
+    $vCalss = explode('-', $sClass);
+    $sPrioriSQL.= array_shift($vSQLConjunctions)." user_info.grade = '$vCalss[0]' AND user_info.class='$vCalss[1]' ";
+  }
   if (!empty($sVersion)) {
     $sPrioriSQL.= array_shift($vSQLConjunctions)." version IN('$sVersion') ";
   }
@@ -148,20 +152,22 @@ function getRecodeData() {
   $vClassData = $oClass->fetchAll(\PDO::FETCH_ASSOC);
 
   foreach ($vClassData as $vData) {
-    $vCondSelect['class'][] = $vData['grade'].'年'.$vData['class'].'班';
+    $vCondSelect['class'][$vData['grade'].'-'.$vData['class']] = $vData['grade'].'年'.$vData['class'].'班';
   }
+  // 加入老師在 user_info 的班級
+  $vCondSelect['class'][$vUserData['grade'].'-'.$vUserData['class_name']] = $vUserData['grade'].'年'.$vUserData['class_name'].'班';
 
   // 將資料整理回 $vPrioriData, Return用
   $vPrioriData['Condition'] = array();
   $vPrioriData['Condition']['version'] = array_unique($vCondSelect['version']);
   $vPrioriData['Condition']['date'] = array_unique($vCondSelect['exam_range']);
   $vPrioriData['Condition']['subject'] = array_unique($vCondSelect['subject']);
-  $vPrioriData['Condition']['class'] = array_unique($vCondSelect['class']);
+  $vPrioriData['Condition']['class'] = $vCondSelect['class'];
 
   $vPrioriData['Mission'] = array();
   $vPrioriData['Mission'] = $vMission;
 
-  // echo 'Priori: '.$sPrioriSQL;
+  // echo 'Priori: '.$sPrioriSQL.'</br>'.$sClass;
   // echo '<pre>';
   // print_r($vPrioriData);
   return $vPrioriData;
@@ -181,6 +187,8 @@ function handleData() {
 
     $vUser = explode('-', $vData['user_id']);
     $vPrioriRemedyRate = explode(_SPLIT_SYMBOL, $vData['priori_remedy_rate']);
+
+    // 測試題目節點
     $vIndicatorItem = explode(_SPLIT_SYMBOL, $vData['indicator_item']);
     $vBigNodeStatus = unserialize($vData['bNodes_Status']);
     // echo $vData['user_id'].'<br/>';
@@ -188,7 +196,16 @@ function handleData() {
     // echo '<pre>';
 
     $vAdpNodeStatus = array();
+    $vDuplicateNode = array();
     foreach ($vIndicatorItem as $sIndx => $sNodeName) {
+      // 去除重複節點
+      if (!isset($vDuplicateNode[$sNodeName])) {
+        $vDuplicateNode[$sNodeName] = $sNodeName;
+      }
+      else {
+        continue;
+      }
+
       if ('' == $vBigNodeStatus[$sNodeName]['bstatus:'] && '0' != $vBigNodeStatus[$sNodeName]['bstatus:']) {
         $vBigNodeStatus[$sNodeName]['bstatus:'] = '-1';
       }
@@ -196,7 +213,7 @@ function handleData() {
         $vAdpNodeStatus[$sIndx]['select'] = 'checked';
       }
 
-      if (!empty($vMission) && in_array($sNodeName,$vMission[$vData['user_id']])) {
+      if (!empty($vMission) && @in_array($sNodeName,$vMission[$vData['user_id']])) {
         $vAdpNodeStatus[$sIndx]['select'] = 'checked';
         $vAdpNodeStatus[$sIndx]['disabled'] = ' disabled';
       }
@@ -219,7 +236,7 @@ function handleData() {
     );
     $vReportData['remedial']['report'] = $vNewData;
   }
-  $vReportData['remedial']['indicator_item'] = $vIndicatorItem;
+  $vReportData['remedial']['indicator_item'] = $vDuplicateNode;
 
   // 標題，取第一筆資料的為主
   $vReportData['concept'] = $vNewData[0]['concept'];
@@ -263,12 +280,12 @@ function getSelector() {
   $vSelect[] = '<select id="select_class" name="select_class">';
   $vSelect[] =   '<option value="">班級</option>';
   if (!$bDataEmpty) {
-    foreach ($vReportData['Condition']['class'] as $sClass) {
+    foreach ($vReportData['Condition']['class'] as $sKey => $sClass) {
       $sSelected = '';
-      if ($vCond['select_class'] == $sClass) {
+      if ($vCond['select_class'] == $sKey) {
         $sSelected = 'selected';
       }
-      $vSelect[] = '<option value="'.$sClass.'" '.$sSelected.'>'.  $sClass.'</option>';
+      $vSelect[] = '<option value="'.$sKey.'" '.$sSelected.'>'.  $sClass.'</option>';
     }
   }
   $vSelect[] = '</select>';
@@ -306,7 +323,8 @@ function getCondetionRange() {
   }
 
   if (!empty($vCond['select_class'])) {
-    $sUserSearch .= $vCond['select_class'].' / ';
+    $vCalss = explode('-', $vCond['select_class']);
+    $sUserSearch .= $vCalss[0].'年'.$vCalss[1].'班 / ';
   }
   else {
     $sUserSearch .= '全部班級 / ';
@@ -377,6 +395,25 @@ function getCondetionRange() {
   $(function () {
     $('#btn_query').click(function (){
       $.LoadingOverlay("show");
+      //
+      // if('' == $('#select_date').val()) {
+      //   alert('請選擇日期');
+      //   return;
+      // }
+      // else if('' == $('#select_subject').val()) {
+      //   alert('請選擇科目');
+      //   return;
+      // }
+      // else if('' == $('#select_class').val()) {
+      //   alert('請選擇日期');
+      //   return;
+      // }
+      // else if('' == $('#select_version').val()) {
+      //   alert('請選擇日期');
+      //   return;
+      // }
+      //
+      // $('#query_form').submit();
     });
 
     $(document).ready(function () {
@@ -423,7 +460,7 @@ function getCondetionRange() {
                 data: oPost,
                 method: "POST",
                 success: function (sRtn) {
-                  console.log(sRtn);
+                  // console.log(sRtn);
                 },
                 error: function (jqXHR, textStatus, errorMessage) {
                   alert('該任務選擇失敗, 請重新勾選');
@@ -472,7 +509,7 @@ function getCondetionRange() {
   <div class="content2-Box">
 	  <div class="path">目前位置：補救診斷報告</div>
     <div class="left-box">
-      <form method="POST">
+      <form id="query_form" method="POST">
         <?php echo $sCondSelect; ?>
         <input id="btn_query" name="btn_query" type="submit" value="查詢" class="btn02">
       </form>
@@ -520,7 +557,14 @@ function getCondetionRange() {
           <tbody>
             <tr v-for="item in Report">
               <td>{{item.user_id}}</td>
-              <td><a class="venobox" data-type="iframe" style="text-decoration:underline;" v-bind:href="'modules.php?op=modload&name=remedyTest&file=print_prioriData&screen=frame&showperson=Y&studentid=' + item.user_id_full + '&cp_id=' + item.cp_id + '&exam_sn=' + item.exam_sn">{{item.user_name}}</td>
+              <td>
+                <a class="venobox"
+                   data-type="iframe"
+                   style="text-decoration:underline;"
+                   v-bind:href="'modules.php?op=modload&name=remedyTest&file=print_prioriData&screen=frame&showperson=Y&studentid=' + item.user_id_full + '&cp_id=' + item.cp_id + '&exam_sn=' + item.exam_sn + '&user_name=' + item.user_name">
+                   {{item.user_name}}
+                 </a>
+              </td>
             </tr>
           </tbody>
         </table>

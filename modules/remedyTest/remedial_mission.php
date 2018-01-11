@@ -98,7 +98,7 @@
       $vPara['target_type'] = 'I';
       $vPara['mission_type'] = '3';
       $vPara['create_time'] = date("Y-m-d H:i:s");
-      $vPara['endYear'] = '';
+      $vPara['endYear'] = '1';
       $vPara['exam_type'] = $_POST['exam_type'];
 
       // 計算縱貫題數
@@ -137,7 +137,8 @@
       $sStudentID = $vUserData['organization_id'].'-'.$_GET['studentid'];
       $vNodeData = $_SESSION['remedyTest'][$sCpID][$sStudentID];
 
-      $sTitle = $_GET['studentid'].' '.$_GET['studentname'];
+      // $sTitle = $_GET['studentid'].' '.$_GET['studentname'];
+      $sTitle = $_GET['studentname'];
       $sNode = '';
       if (!empty($vNodeData)) {
         foreach ($vNodeData as $sName => $sStatus) {
@@ -198,6 +199,7 @@ function getIndicatorData($sNode) {
 </style>
 <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.13/vue.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
 <script>
 var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
   console.log(oItem);
@@ -210,6 +212,7 @@ var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
         data: oItem,
         mounted: function () {
           $('#OKBtn').click(function () {
+            $.LoadingOverlay("show");
 
             var oPost = {};
             oPost.status = 'assign';
@@ -245,7 +248,7 @@ var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
                 data: oPost,
                 method: "POST",
                 success: function (sRtn) {
-                  console.log(sRtn);
+                  parent.location.reload();
                 },
                 error: function (jqXHR, textStatus, errorMessage) {
                   alert('指派失敗, 請重試');
@@ -253,10 +256,6 @@ var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
                 }
             }); // ajax end
           }); // OKBtn end
-
-          $('#cancelBtn').click(function () {
-
-          });
         }
       }); // Vue end
     }); // document ready end
@@ -265,7 +264,7 @@ var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
 </script>
 </head>
 <body>
-  <div class="title01" style="text-align:left;">步驟一：建立<?php echo $sTitle; ?>的任務</div>
+  <div class="title01" style="text-align:left;">步驟一：建立 <b><?php echo $sTitle; ?></b> 的任務</div>
   <div class="class-list2 test-search" style="width:98%;margin:5px auto;">
     <div class="work-box-33" style="width: calc(50% - 5px);">任務名稱：<br>
       <input type="text" id="mission_nm" placeholder="請輸入任務名稱" required>
