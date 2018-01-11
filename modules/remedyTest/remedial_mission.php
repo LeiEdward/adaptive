@@ -202,7 +202,7 @@ function getIndicatorData($sNode) {
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
 <script>
 var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
-  console.log(oItem);
+  // console.log(oItem);
 
   $(function () {
     $(document).ready(function () {
@@ -297,14 +297,14 @@ var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
         <col />
         <col style="width:50%;"/>
         <col />
-        <col />
+        <!-- <col /> -->
       </colgroup>
       <thead>
         <tr>
           <th>&nbsp;</th>
           <th>能力指標</th>
           <th>指標內容說明</th>
-          <th>移除</th>
+          <!-- <th>移除</th> -->
         </tr>
       </thead>
       <tbody>
@@ -313,7 +313,7 @@ var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
           <td>{{index+1}}</td>
           <td>{{item.indicator}}</td>
           <td>{{item.indicate_name}}</td>
-          <td><input type="button" class="btn05" value="移除" btntype="delete"></td>
+          <!-- <td><input type="button" class="btn05" value="移除" btntype="delete"></td> -->
         </tr>
       </tbody>
     </table>

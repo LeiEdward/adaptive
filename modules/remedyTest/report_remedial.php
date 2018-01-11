@@ -388,14 +388,14 @@ function getCondetionRange() {
   .rem_pass {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-03.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.13/vue.min.js"></script>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tinyscrollbar/2.4.2/jquery.tinyscrollbar.min.js"></script>
 <script>
   var oItem = $.parseJSON('<?php echo $sJSOject; ?>');
 
   $(function () {
     $('#btn_query').click(function (){
       $.LoadingOverlay("show");
-      //
       // if('' == $('#select_date').val()) {
       //   alert('請選擇日期');
       //   return;
@@ -417,6 +417,7 @@ function getCondetionRange() {
     });
 
     $(document).ready(function () {
+
       $('#div_title').html(oItem.concept);
       $.LoadingOverlay("show");
 
@@ -435,8 +436,16 @@ function getCondetionRange() {
       var vueRemedial = new Vue({
         el: '#div_remedial',
         data: oItem,
+        beforeCreate: function () {
+          $.LoadingOverlay("show");
+        },
         mounted: function () {
           $.LoadingOverlay("hide");
+          $.LoadingOverlay("hide");
+
+          $("#scroll_detail").tinyscrollbar({trackSize: 100,
+                                             options: {axis:'y'}});
+
           $('.venobox').venobox();
 
           $('.assign_mission > input[type="checkbox"]').change(function (e) {
