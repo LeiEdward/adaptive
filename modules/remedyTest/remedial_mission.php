@@ -166,6 +166,7 @@
                                   'cp_id' => $_GET['cp_id']));
 
       // echo '<pre>';
+      // print_r($vNodeData);
       // print_r($vIndicatorData);
 
       break;

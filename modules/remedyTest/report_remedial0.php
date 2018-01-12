@@ -339,7 +339,7 @@
   }
 ?>
 <style>
-  .tippic {display:table;font-size:14px;white-space:nowrap;}
+  .tippic {display:table;font-size:14px;white-space:nowrap;padding-top:40px;}
   .tippic > dd {display:table-row;}
   .tippic > dd > * {display:table-cell;}
   .tippic > dd > i {font-style:normal;}
@@ -387,7 +387,6 @@
   .rem_pass {display:block;width:25px;height:25px;background-image:url('./images/start/p5-4-03.png');background-size:100%;background-position:center;background-repeat:no-repeat;}
   .rem_left {cursor:pointer;position:absolute;top:-35px;right:165px;display:block;width:35px;height:35px;background-image:url('./images/g_left.svg');background-size:100%;background-position:center;background-repeat:no-repeat;}
   .rem_right {cursor:pointer;position:absolute;top:-35px;right:120px;display:block;width:35px;height:35px;background-image:url('./images/g_right.svg');background-size:100%;background-position:center;background-repeat:no-repeat;}
-  .left-box-c {width:185px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.13/vue.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@1.5.4/src/loadingoverlay.min.js"></script>
@@ -397,9 +396,7 @@
 
   // $(function () {
     $(document).ready(function () {
-      $('#btn_query').click(function () {
-        $.LoadingOverlay("show");
-      });
+
       $('#div_title').html(oItem.concept);
       $.LoadingOverlay("show");
 
@@ -426,6 +423,10 @@
           $.LoadingOverlay("hide"); // beforeCreate 用
 
           $('.venobox').venobox();
+
+          $('#btn_query').click(function (){
+            $.LoadingOverlay("show");
+          });
 
           $('.scroll_detail > .rem_left').click(function (){
             $('.scroll_detail')[0].scrollBy(-200, 0);
@@ -504,54 +505,48 @@
 <body>
   <div class="content2-Box">
 	  <div class="path">目前位置：補救診斷報告</div>
-    <div class="eft-box-o" style="width:185px;display:inline-block;">
-      <div class="left-box-c">
-        <form id="query_form" method="POST">
-          <?php echo $sCondSelect; ?>
-          <input id="btn_query" name="btn_query" type="submit" value="查詢" class="btn02">
-        </form>
-      </div>
-      <br/>
-      <div class="left-box-c">
-        <dl class="tippic">
-          <dd>
-            <i>▼</i><span style="text-align:center;font-weight:bold;font-size:20px;">補救教學圖例</span>
-          </dd>
-          <dd>
-            <i>Ｏ</i><span>表示所有試題均通過</span>
-          </dd>
-          <dd>
-            <i>Ｘ</i>
-            <span>表示所有試題均未通過</span>
-          </dd>
-          <dd><i style="font-family:sans-serif;">△</i>
-            <span>表示評部分試題未通過</span>
-          </dd>
-          <dd>
-            <i>N</i>
-            <span>表示尚未有測驗資料</span>
-          </dd>
-        </dl>
-        <dl class="tippic">
-          <dd>
-            <i>▼</i><span style="text-align:center;font-weight:bold;font-size:20px;padding-top:10px;">因材網圖例</span>
-          </dd>
-          <dd>
-            <i class="rem_naver"></i>
-            <span>&nbsp;未測驗</span>
-          </dd>
-          <dd>
-            <i class="rem_help"></i>
-            <span>&nbsp;待補救</span>
-          </dd>
-          <dd>
-            <i class="rem_pass"></i>
-            <span>&nbsp;精熟</span>
-          </dd>
-        </dl>
-      </div>
+    <div class="left-box" style="width:185px;">
+      <form id="query_form" method="POST">
+        <?php echo $sCondSelect; ?>
+        <input id="btn_query" name="btn_query" type="submit" value="查詢" class="btn02">
+      </form>
+      <dl class="tippic">
+        <dd>
+          <i>▼</i><span style="font-weight:bold;font-size:20px;">補救教學圖例</span>
+        </dd>
+        <dd>
+          <i>Ｏ</i><span>表示所有試題均通過</span>
+        </dd>
+        <dd>
+          <i>Ｘ</i>
+          <span>表示所有試題均未通過</span>
+        </dd>
+        <dd><i style="font-family:sans-serif;">△</i>
+          <span>表示評部分試題未通過</span>
+        </dd>
+        <dd>
+          <i>N</i>
+          <span>表示尚未有測驗資料</span>
+        </dd>
+      </dl>
+      <dl class="tippic">
+        <dd>
+          <i>▼</i><span style="font-weight:bold;font-size:20px;">因材網圖例</span>
+        </dd>
+        <dd>
+          <i class="rem_naver"></i>
+          <span>&nbsp;未測驗</span>
+        </dd>
+        <dd>
+          <i class="rem_help"></i>
+          <span>&nbsp;待補救</span>
+        </dd>
+        <dd>
+          <i class="rem_pass"></i>
+          <span>&nbsp;精熟</span>
+        </dd>
+      </dl>
     </div>
-
 		<div id="div_remedial" class="right-box" style="width:calc(100% - 185px - 7px);">
 
       <div id="div_title" class="title01"></div>
