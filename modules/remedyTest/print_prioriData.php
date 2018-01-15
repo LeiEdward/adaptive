@@ -132,7 +132,7 @@ function prioriExamResult($user_id,$cp_id,$exam_sn,$user_name=''){
 			$status = $ary['status:'];
 			$ep_node[] = $node;
 			$sNode_status_array[$key] = $status;
-			if( $status == 1 ){
+			if( $status == 1){ // || $status == 2 
 				$_SESSION[stuNodeStatus][sNode][$node]=1;
 			}else{
 				$_SESSION[stuNodeStatus][sNode][$node]=0;
@@ -195,7 +195,7 @@ function prioriExamResult($user_id,$cp_id,$exam_sn,$user_name=''){
 			//echo $data_mov;
 			//為了概念試題顯示的函數用
 			$loop++;
-			if($status==1){
+			if($status==1){ // || $status==2
 				$sNode_status_ch='Pass';
 				$_SESSION[stuNodeStatus][sNode][$sNode]=1;
 				$statusHtml='<a class="dialogify" ><img src=".\images\icon\O.png"></a>';
@@ -229,7 +229,7 @@ function prioriExamResult($user_id,$cp_id,$exam_sn,$user_name=''){
 			}
 			//echo 'sNode:'.$sNode.'<br>';
 			$tmpHtml[$bNode][$sNode]='
-            <tr id="node:'.$sNode.'_status:'.$sNode_status_ch.'">
+            <tr id="node:'.$sNode.'_status:'.$bNode_status_ch.'">
             <td> <a class="show" title="'.$nodeName.'" href="modules/D3/app/index_view.php?aa='.base64_encode($_SESSION[user_id]).'&map_sn='.$map_sn.'&find_nodes='.$nodeLowNode.'" target="_blank">'.$sNode.'</a></td>
             <td> '.$statusHtml.'</td>
             <td> '.$videoHtml.'</td>
